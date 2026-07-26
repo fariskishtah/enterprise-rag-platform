@@ -22,6 +22,8 @@ tmp/
 
 # Model and Hugging Face caches
 models/
+!backend/app/models/
+!backend/app/models/*.py
 model_cache/
 .cache/
 huggingface/
