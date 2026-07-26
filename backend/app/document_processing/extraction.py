@@ -94,6 +94,13 @@ def _safe_metadata(raw: dict[Any, Any] | None) -> dict[str, str]:
 
 
 class PdfExtractor:
+    def __init__(self) -> None:
+        from app.document_processing.ocr import OcrEngine
+        from app.document_processing.tables import TableExtractor
+
+        self.ocr_engine = OcrEngine()
+        self.table_extractor = TableExtractor()
+
     def extract(self, path: Path) -> ExtractedDocument:
         try:
             reader = PdfReader(path, strict=False)
@@ -104,22 +111,54 @@ class PdfExtractor:
                 )
             warnings: list[str] = []
             values: list[dict[str, Any]] = []
+
             for page_index, page in enumerate(reader.pages, start=1):
                 try:
-                    text = page.extract_text() or ""
+                    text = (page.extract_text() or "").strip()
                 except Exception:
-                    warnings.append(f"Page {page_index} could not be extracted.")
-                    continue
-                if not text.strip():
+                    text = ""
+
+                # Check text density - trigger OCR fallback if page has minimal or no digital text
+                if len(text) < 50:
+                    ocr_res = self.ocr_engine.process_pdf_page(path, page_index)
+                    warnings.extend(ocr_res.warnings)
+                    if ocr_res.text:
+                        text = ocr_res.text
+
+                if not text:
                     warnings.append(f"Page {page_index} contains no extractable text.")
                     continue
+
                 values.append(
                     {
                         "text": text,
                         "page_number": page_index,
-                        "metadata": {"source_kind": "pdf_page", "page_number": page_index},
+                        "metadata": {
+                            "source_kind": "pdf_page",
+                            "page_number": page_index,
+                            "ocr_used": len(text) > 0 and len(page.extract_text() or "") < 50,
+                        },
                     }
                 )
+
+            # Append structured table sections if found
+            tables = self.table_extractor.extract_pdf_tables(path)
+            for table in tables:
+                values.append(
+                    {
+                        "text": f"### Extracted Table ({table.table_id})\n\n{table.markdown}",
+                        "page_number": table.page_number,
+                        "heading": f"Table {table.table_id}",
+                        "metadata": {
+                            "source_kind": "pdf_table",
+                            "table_id": table.table_id,
+                            "page_number": table.page_number,
+                            "row_count": len(table.rows),
+                            "col_count": len(table.headers),
+                        },
+                    }
+                )
+
             return _assemble_sections(
                 values,
                 page_count=len(reader.pages),

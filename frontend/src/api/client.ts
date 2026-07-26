@@ -392,3 +392,133 @@ export function mediaContentUrl(mediaId: string): string {
 export function mediaExportUrl(mediaId: string, kind: string): string {
   return `${API_BASE_URL}/media/${mediaId}/export/${kind}`;
 }
+
+export function seedDemoWorkspace(): Promise<{ status: string; knowledge_base_id: string; message: string }> {
+  return request("/demo/seed", { method: "POST" });
+}
+
+export function listTemplates(): Promise<Array<{
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  prompt_instruction: string;
+  supported_source_types: string[];
+  output_schema_type: string;
+  safety_classification: string;
+  icon_name: string;
+}>> {
+  return request("/templates");
+}
+
+export function submitFeedback(input: {
+  knowledgeBaseId: string;
+  question: string;
+  answer: string;
+  rating: string;
+  category?: string;
+  comment?: string;
+  chatMessageId?: string;
+}): Promise<{ id: string; status: string }> {
+  return request("/feedback", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      knowledge_base_id: input.knowledgeBaseId,
+      question: input.question,
+      answer: input.answer,
+      rating: input.rating,
+      category: input.category ?? "other",
+      comment: input.comment,
+      chat_message_id: input.chatMessageId,
+    }),
+  });
+}
+
+export function getFeedbackAnalytics(): Promise<{
+  total_feedback: number;
+  helpful_count: number;
+  unhelpful_count: number;
+  helpful_rate: number;
+  complaint_categories: Record<string, number>;
+}> {
+  return request("/feedback/analytics");
+}
+
+export function convertFeedbackToEval(feedbackId: string, datasetId: string): Promise<{ case_id: string; status: string }> {
+  return request(`/feedback/${feedbackId}/convert-to-eval`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dataset_id: datasetId }),
+  });
+}
+
+export function listEvaluationDatasets(): Promise<Array<{
+  id: string;
+  knowledge_base_id: string;
+  name: string;
+  description: string | null;
+  case_count: number;
+}>> {
+  return request("/evaluation/datasets");
+}
+
+export function listEvaluationRuns(): Promise<Array<{
+  id: string;
+  dataset_id: string;
+  engine: string;
+  model_name: string;
+  total_cases: number;
+  passed_cases: number;
+  failed_cases: number;
+  correctness_rate: number;
+  faithfulness_rate: number;
+  citation_accuracy: number;
+  median_latency_ms: number;
+  p95_latency_ms: number;
+}>> {
+  return request("/evaluation/runs");
+}
+
+export function runEvaluation(datasetId: string): Promise<{
+  id: string;
+  dataset_id: string;
+  engine: string;
+  model_name: string;
+  total_cases: number;
+  passed_cases: number;
+  failed_cases: number;
+  correctness_rate: number;
+  faithfulness_rate: number;
+  citation_accuracy: number;
+  median_latency_ms: number;
+  p95_latency_ms: number;
+}> {
+  return request(`/evaluation/runs?dataset_id=${encodeURIComponent(datasetId)}`, {
+    method: "POST",
+  }, INTELLIGENCE_TIMEOUT_MS);
+}
+
+export function registerUser(input: {
+  email: string;
+  password: string;
+  full_name?: string;
+}): Promise<{ id: string; email: string; full_name: string; role: string; is_active: boolean }> {
+  return request("/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function loginUser(input: {
+  email: string;
+  password: string;
+}): Promise<{ access_token: string; token_type: string; user_id: string; email: string; role: string }> {
+  return request("/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+

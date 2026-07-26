@@ -1,0 +1,16 @@
+.git
+.gitignore
+.venv
+node_modules
+dist
+data
+data/models
+data/uploads
+*.pyc
+__pycache__
+.pytest_cache
+.ruff_cache
+artifacts/playwright-report
+backend/.venv
+frontend/node_modules
+frontend/dist

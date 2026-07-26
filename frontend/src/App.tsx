@@ -33,6 +33,21 @@ const VideoPage = lazy(() =>
 const WorkspacePage = lazy(() =>
   import("./pages/WorkspacePage").then((module) => ({ default: module.WorkspacePage })),
 );
+const LandingPage = lazy(() =>
+  import("./pages/LandingPage").then((module) => ({ default: module.LandingPage })),
+);
+const EvaluationPage = lazy(() =>
+  import("./pages/EvaluationPage").then((module) => ({ default: module.EvaluationPage })),
+);
+const FeedbackPage = lazy(() =>
+  import("./pages/FeedbackPage").then((module) => ({ default: module.FeedbackPage })),
+);
+const TemplatesPage = lazy(() =>
+  import("./pages/TemplatesPage").then((module) => ({ default: module.TemplatesPage })),
+);
+const LoginPage = lazy(() =>
+  import("./pages/LoginPage").then((module) => ({ default: module.LoginPage })),
+);
 
 export default function App() {
   const path = window.location.pathname.replace(/\/$/, "") || "/";
@@ -42,6 +57,16 @@ export default function App() {
   const page =
     path === "/" ? (
       <DashboardPage />
+    ) : path === "/landing" ? (
+      <LandingPage />
+    ) : path === "/evaluation" ? (
+      <EvaluationPage />
+    ) : path === "/feedback" ? (
+      <FeedbackPage />
+    ) : path === "/templates" ? (
+      <TemplatesPage />
+    ) : path === "/login" ? (
+      <LoginPage />
     ) : path === "/knowledge-bases" ? (
       <KnowledgeBasesPage />
     ) : path === "/upload" ? (

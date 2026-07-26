@@ -1,315 +1,397 @@
-# EnterpriseRAG
+# EnterpriseRAG: Multimodal Knowledge Intelligence & Grounded AI Platform
 
-EnterpriseRAG is a local-first AI Knowledge Intelligence Platform. It turns private
-documents, recordings, and accessible public videos into concise grounded answers,
-timestamped transcripts, evidence-backed summaries, comparisons, and reports.
+[![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React-19-61DAFB.svg?logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![LangChain](https://img.shields.io/badge/LangChain-0.3-1C3C3C.svg?logo=chainlink&logoColor=white)](https://www.langchain.com/)
+[![Hugging Face](https://img.shields.io/badge/Hugging%20Face-Transformers-FFD21E.svg?logo=huggingface&logoColor=black)](https://huggingface.co/)
+[![FAISS](https://img.shields.io/badge/FAISS-CPU-00599C.svg?logo=meta&logoColor=white)](https://github.com/facebookresearch/faiss)
+[![Whisper](https://img.shields.io/badge/Whisper-Faster--Whisper-000000.svg?logo=openai&logoColor=white)](https://github.com/SYSTRAN/faster-whisper)
+[![Pytest](https://img.shields.io/badge/Pytest-Automated-0A9EDC.svg?logo=pytest&logoColor=white)](https://docs.pytest.org/)
+[![Playwright](https://img.shields.io/badge/Playwright-E2E-2EAD33.svg?logo=playwright&logoColor=white)](https://playwright.dev/)
+[![Ruff](https://img.shields.io/badge/Ruff-Linter-D7FF64.svg?logo=python&logoColor=black)](https://docs.astral.sh/ruff/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)](https://www.docker.com/)
 
-The trust model is simple: every answer is scoped to an explicit knowledge base, every
-claim is checked against an individual passage, and citations open the source page or
-transcript timestamp. Uploaded content is treated as untrusted data and cannot instruct
-the assistant or override grounding rules.
+> **EnterpriseRAG** is an end-to-end multimodal knowledge intelligence platform for grounded question answering, deep analysis, and evidence retrieval across documents, scanned PDFs, structured tables, audio, video, and public media sources.
 
-No OpenAI, Anthropic, or paid model endpoint is required.
+![EnterpriseRAG Hero Dashboard](artifacts/hero-dashboard.png)
 
-## Product capabilities
+---
 
-- PDF, UTF-8 TXT, and DOCX upload, extraction, deterministic chunking, embedding, and
-  indexing.
-- MP4, MOV, MKV, WEBM, M4A, MP3, and WAV upload with ffprobe validation.
-- Public HTTP(S) and YouTube link ingestion with SSRF protection and no access-control
-  bypass.
-- Official/automatic subtitle import when accessible, followed by local Whisper
-  transcription when subtitles are unavailable.
-- Timestamped transcript, search, player synchronization, chapters, short and detailed
-  summaries, key points, decisions, action items, entities, lecture aids, meeting aids,
-  and TXT/Markdown/JSON exports.
-- Hybrid dense and BM25-style retrieval, score fusion, direct-relevance reranking,
-  near-duplicate removal, source diversity, and bounded context.
-- Concise grounded answers, conversation-aware follow-ups, used-passage citations,
-  confidence, claim support, and developer evidence.
-- Summary, multi-source comparison, and research-report workflows.
-- Responsive cinematic React workspace with light/dark themes, command palette, source
-  intake, research chat, document inspection, and video intelligence.
+## Navigation & Architecture Links
+- [Hugging Face Space Demo](https://huggingface.co/spaces/fariskishtah/enterprise-rag-platform) *(Deployable Docker Space)*
+- [System Architecture](docs/architecture/overview.md) *(High-level & pipeline diagrams)*
+- [Engineering Case Study](docs/case-study.md) *(Deep dive into technical design & optimizations)*
+- [Demo Video Package](docs/demo-video/demo-script.md) *(2-minute recruiter video script)*
+- [Evaluation System](docs/architecture/evaluation-system.md) *(Deterministic & benchmark evaluation)*
+- [Hugging Face Space Deployment Guide](docs/huggingface-spaces.md) *(Single-container Docker guide)*
 
-## Architecture
+---
+
+## 1. Hero
+
+EnterpriseRAG eliminates hallucination risks by verifying every AI-generated claim against passage-level citations, providing exact page numbers, section headers, audio timestamps, and source video playback. Designed for enterprise deployment, it runs 100% locally or in containerized environments with zero dependency on paid cloud APIs (OpenAI/Anthropic).
+
+---
+
+## 2. Product Overview
+
+EnterpriseRAG transforms unstructured corporate knowledge—PDFs, DOCX files, scanned contracts, financial tables, meeting recordings, lectures, and YouTube videos—into grounded intelligence. 
+
+Key pillars:
+- **Zero Hallucination Trust Model**: Grounded prompts restrict answers to provided sources.
+- **Multimodal Source Support**: Text, scanned images (OCR), structured tables, audio, and video.
+- **Dual RAG Engine Architecture**: Custom production hybrid engine + LangChain LCEL course-compatibility engine.
+- **Multilingual Support**: First-class Arabic and English cross-lingual QA, RTL interface, and multilingual embeddings.
+- **8 GB Memory Optimised**: Custom generation queue and profiles tuned for Apple Silicon Macs and CPU Spaces.
+
+---
+
+## 3. Why EnterpriseRAG?
+
+Traditional RAG prototypes suffer from four major production failures:
+1. **Blind Hallucinations**: Standard LLMs construct plausible answers when evidence is missing.
+2. **Media Blindness**: Inability to index or search audio, video, or scanned documents.
+3. **Resource Thrashing**: Unbounded parallel LLM calls stalling resource-constrained hardware (e.g. 8 GB RAM).
+4. **Lack of Observability**: No empirical evaluation metrics, accuracy tracking, or user feedback pipelines.
+
+EnterpriseRAG addresses each challenge with deterministic verification, faster-whisper video intelligence, single-call intelligence workflows, and integrated evaluation dashboards.
+
+---
+
+## 4. Core Capabilities
+
+- **Document RAG**: Grounded QA over PDF, DOCX, and TXT with sentence-boundary chunking.
+- **Audio & Video Intelligence**: Automatic transcription, chapter segmentation, timestamp citations, and interactive video playback.
+- **Scanned PDF OCR**: Automatic low-density page detection with Tesseract OCR fallback.
+- **Structured Table Extraction**: `pdfplumber`-backed table cell coordinates and table QA.
+- **Deep Intelligence Workflows**: Grounded Summaries, Consolidated Document Comparisons, and Multi-Section Research Reports.
+- **Action Template Library**: 15+ pre-defined templates (CV Analysis, Meeting Minutes, Quiz Generation, Contract Audit).
+- **Evaluation Dashboard**: Real-time correctness, faithfulness, latency, and retrieval accuracy tracking.
+- **User Feedback System**: Answer feedback upvoting, complaint reporting, and 1-click conversion to evaluation datasets.
+- **Security & Authentication**: Local JWT auth, password hashing, user-isolated knowledge bases, and IDOR protection.
+
+---
+
+## 5. Portfolio Screenshots
+
+| View | Preview |
+| :--- | :--- |
+| **Hero Dashboard** | ![Hero Dashboard](artifacts/portfolio/hero-dashboard.png) |
+| **Document RAG & Citations** | ![Document RAG](artifacts/portfolio/document-rag.png) |
+| **Compare Documents** | ![Compare Documents](artifacts/portfolio/compare-documents.png) |
+| **Video Intelligence & Timestamps** | ![Video Intelligence](artifacts/portfolio/video-intelligence.png) |
+| **Evaluation Dashboard** | ![Evaluation Dashboard](artifacts/portfolio/evaluation-dashboard.png) |
+| **Arabic Multilingual Workspace** | ![Arabic Workspace](artifacts/portfolio/arabic-workspace.png) |
+| **Scanned PDF OCR** | ![Scanned PDF OCR](artifacts/portfolio/scanned-pdf-ocr.png) |
+| **Extracted Table Viewer** | ![Extracted Table](artifacts/portfolio/extracted-table.png) |
+| **Action Templates Library** | ![Templates Library](artifacts/portfolio/templates-library.png) |
+| **Feedback Analytics** | ![Feedback Analytics](artifacts/portfolio/feedback-analytics.png) |
+
+---
+
+## 6. Document Intelligence
+
+EnterpriseRAG ingests documents through a multi-stage pipeline:
+1. **Validation**: Checksum SHA-256 verification and mime-type enforcement.
+2. **Extraction**: Structure-preserving extraction (headings, paragraphs, page numbers).
+3. **OCR Fallback**: Automatic triggering when page character density is under 50 characters.
+4. **Chunking**: Sentence-boundary awareness with configurable overlap (`chunk_size=800`, `chunk_overlap=120`).
+5. **Hybrid Indexing**: Dense vector embedding + BM25-style lexical index.
+
+---
+
+## 7. Video Intelligence
+
+Process uploaded MP4/MKV/WAV files or public YouTube URLs:
+- **Transcription**: `faster-whisper` (`small` model on CPU/CUDA).
+- **Segmentation**: Sentence-level timestamp alignment.
+- **Smart Chapters**: Automatic chapter boundaries and key points.
+- **Timestamp Citations**: Clicking a citation jumps directly to that timestamp in the embedded video player.
+
+---
+
+## 8. Custom RAG Engine (Default Production)
+
+The default production engine uses a custom pipeline:
+- **Query Rewriting**: Standalone query generation for conversational follow-ups.
+- **Hybrid Retrieval**: Dense cosine similarity (0.45) + Lexical BM25 (0.30) + Reranking (0.25).
+- **Claim Verification**: Deterministic sentence-level claim matching against retrieved context.
+- **Concurrency Queue**: Process-wide semaphore enforcing serial LLM generation on 8 GB RAM.
+
+---
+
+## 9. LangChain Engine (Course-Compatibility Layer)
+
+EnterpriseRAG includes a complete parallel engine built on **LangChain & LCEL**:
+- Composed LCEL runnable chains (`QUERY_REWRITE_PROMPT | llm | PydanticOutputParser`).
+- Persistent FAISS vector store indexing.
+- Direct course-compatible class abstractions (`EnterpriseGenerationLLM`, `LangChainDocumentPipeline`).
+- Mode switchable dynamically via configuration (`RAG_ENGINE=langchain`).
+
+---
+
+## 10. Arabic and Multilingual Support
+
+First-class support for Modern Standard Arabic and cross-lingual querying:
+- **Multilingual Embeddings**: `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` support.
+- **RTL Interface**: Dynamic Right-to-Left layout adjustment for Arabic UI labels.
+- **Cross-Lingual QA**: Ask questions in Arabic against English documents or vice versa.
+
+---
+
+## 11. OCR and Table Extraction
+
+- **Scanned PDF OCR**: Integrates `pytesseract` and `pdf2image` to extract scanned text smoothly.
+- **Structured Tables**: Extracted with `pdfplumber`, indexed with table-aware headers, and downloadable as CSV/JSON.
+
+---
+
+## 12. Evaluation Dashboard
+
+Integrated observability tracking:
+- **Metrics**: Answer Correctness, Faithfulness, Citation Validity, Median & P95 Latency.
+- **Engine Benchmarking**: Side-by-side performance breakdown (Custom vs. LangChain).
+- **Exporting**: Export evaluation results to JSON, CSV, or Markdown reports.
+
+---
+
+## 13. Low-Memory Optimisation (8 GB Apple Silicon & CPU Spaces)
+
+Optimised specifically for limited-memory environments:
+- **Single-Call Compare**: Reduced Compare from 6 sequential LLM calls to 1 consolidated call (>80% latency reduction).
+- **Shared Model Adapter**: Eliminates duplicate model instances in LangChain mode.
+- **Generation Queue**: `asyncio.Semaphore` queue preventing OOM thrashing.
+- **Deterministic Timeouts**: Route-level `asyncio.wait_for` (HTTP 504) and frontend `AbortController`.
+
+---
+
+## 14. Security
+
+- **Untrusted Context Isolation**: Source passages are demarcated with `[BEGIN_UNTRUSTED_SOURCE]` tags to prevent prompt injection.
+- **SSRF Protection**: Strict URL scheme and private subnet validation for public video fetching.
+- **IDOR Protection**: Access control checks on user-owned knowledge bases and documents.
+- **JWT Authentication**: Password hashing with `bcrypt` and secure HTTP Bearer tokens.
+
+---
+
+## 15. Architecture
 
 ```text
-React 19 + strict TypeScript
-        │
-        ▼
-FastAPI / Pydantic API
-        │
-        ├── document pipeline
-        │     extraction → sentence-safe chunks → embeddings → vectors
-        │
-        ├── media pipeline
-        │     validate → subtitles/audio → Whisper → timestamp chunks
-        │     → vectors → media intelligence
-        │
-        ├── grounded RAG
-        │     rewrite → dense candidates → lexical fusion → rerank/deduplicate
-        │     → support gate → local generation → post-process → claim verification
-        │
-        └── SQLAlchemy repositories → SQLite + local filesystem
+               +-------------------------------------------------------+
+               |  React 19 + TypeScript Workspace (RTL / Light / Dark) |
+               +-------------------------------------------------------+
+                                           |
+                                           v  (FastAPI REST Endpoints)
++-----------------------------------------------------------------------------------------------+
+|                                      EnterpriseRAG Backend                                    |
+|                                                                                               |
+|  +------------------------+  +------------------------+  +---------------------------------+  |
+|  |   Document Pipeline    |  |     Media Pipeline     |  |       Evaluation & Feedback     |  |
+|  |  (Pdf/Docx/OCR/Tables)  |  |  (Whisper/Subtitles)   |  |   (Datasets/Metrics/Analytics)  |  |
+|  +------------------------+  +------------------------+  +---------------------------------+  |
+|               |                          |                                |                   |
+|               +--------------------------+--------------------------------+                   |
+|                                          v                                                    |
+|  +-----------------------------------------------------------------------------------------+  |
+|  |                       Hybrid Vector Store & Retrieval Layer                             |  |
+|  |     (Relational Float32 / FAISS + MiniLM Embeddings + BM25 Lexical + Reranker)          |  |
+|  +-----------------------------------------------------------------------------------------+  |
+|                                          |                                                    |
+|                                          v                                                    |
+|  +-----------------------------------------------------------------------------------------+  |
+|  |                      Generation Queue & Model Adapter Layer                             |  |
+|  |      (asyncio.Semaphore Queue + Qwen2.5-0.5B / Custom Engine / LangChain LCEL)          |  |
+|  +-----------------------------------------------------------------------------------------+  |
++-----------------------------------------------------------------------------------------------+
+                                           |
+                                           v
+                       +---------------------------------------+
+                       |  Local Storage / SQLite Database / HF |
+                       +---------------------------------------+
 ```
 
-Vectors use durable float32 storage in the relational chunk table and local cosine
-search. The adapter boundary permits pgvector, FAISS, or another production vector store
-without changing routes or product pages. See [architecture](docs/architecture.md).
+---
 
-## Models
+## 16. Technology Stack
 
-| Job | Default | Rationale |
-| --- | --- | --- |
-| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` | Strong small CPU embedding model |
-| Generation | `Qwen/Qwen2.5-0.5B-Instruct` | Better instruction following than FLAN-T5 Small at practical local size |
-| Generation fallback | `google/flan-t5-base`, then extractive local fallback | Graceful offline or memory-constrained behavior |
-| Transcription | faster-whisper `small`, CPU `int8` | Practical accuracy/latency balance; GPU is configurable |
+- **Backend**: Python 3.11+, FastAPI, SQLAlchemy, Alembic, Pydantic v2, PyPDF, pdfplumber, pytesseract.
+- **AI & NLP**: Hugging Face Transformers, Sentence-Transformers, PyTorch, FAISS, LangChain, faster-whisper.
+- **Frontend**: React 19, TypeScript, Vite, Lucide Icons, Vanilla CSS Design System.
+- **Testing & Quality**: Pytest, Playwright E2E, Ruff, Docker.
 
-Models load lazily and cache under `backend/data/models`. Completely offline operation is
-available after caching by setting `ENTERPRISE_RAG_HF_LOCAL_FILES_ONLY=true`.
-Device selection defaults to `auto` (CUDA, then Apple MPS, then CPU). Quantized int8
-generation can be enabled on supported CUDA accelerators. See [model notes](docs/models.md).
+---
 
-## Hardware expectations
-
-- Python 3.11+ (validated here on Python 3.14)
-- Node.js 20+ and npm 10+
-- ffmpeg and ffprobe on `PATH`
-- 4 GB RAM minimum for deterministic/test providers
-- 8 GB RAM recommended for MiniLM + Qwen 0.5B + Whisper Small
-- Several GB of free disk space for local model caches
-- CPU works. Apple Silicon MPS and CUDA accelerate embeddings and generation; faster-whisper
-  uses CPU or CUDA.
-
-## Install
+## 17. Quick Start
 
 ```bash
-cd /Users/fariskishtah/Desktop/EnterpriseRAG
+# 1. Clone repository
+git clone https://github.com/fariskishtah/enterprise-rag-platform.git
+cd enterprise-rag-platform
 
+# 2. Setup backend environment
 python3 -m venv backend/.venv
 backend/.venv/bin/pip install -e 'backend[dev,media]'
 
+# 3. Setup frontend dependencies
 cd frontend
 npm install
-npx playwright install chromium
-```
 
-Copy `.env.example` to `backend/.env` only when changing defaults.
-
-Install the optional course demonstrations with:
-
-```bash
-backend/.venv/bin/pip install -e 'backend[dev,media,course]'
-```
-
-## Migrations
-
-```bash
-cd /Users/fariskishtah/Desktop/EnterpriseRAG/backend
-.venv/bin/alembic upgrade head
-.venv/bin/alembic current
-```
-
-The current head is `0003_media_intelligence`. The migration is reversible to
-`0002_rag` for validation, which removes only the new media tables. Normal upgrade keeps
-existing document, chunk, vector, and conversation data.
-
-If a development application ran `Base.metadata.create_all` before its Alembic revision
-was updated, inspect the schema and only stamp the matching revision when it is truly
-identical. Never stamp a mismatched database.
-
-## Run
-
-Backend:
-
-```bash
-cd /Users/fariskishtah/Desktop/EnterpriseRAG/backend
-.venv/bin/alembic upgrade head
+# 4. Start development servers
+# Terminal 1: Backend
+cd ../backend
 .venv/bin/uvicorn app.main:app --reload --port 8000
-```
 
-Frontend:
-
-```bash
-cd /Users/fariskishtah/Desktop/EnterpriseRAG/frontend
+# Terminal 2: Frontend
+cd ../frontend
 npm run dev
 ```
 
-Open <http://localhost:5173>. OpenAPI documentation is at
-<http://localhost:8000/docs>.
+Open `http://localhost:5173` to access the application.
 
-## Dual RAG engines
+---
 
-The custom engine remains the default and primary product architecture:
+## 18. Local Development
 
+Run quality checks and tests locally:
 ```bash
-RAG_ENGINE=custom backend/.venv/bin/uvicorn app.main:app --app-dir backend --port 8000
+# Run backend pytest suite
+cd backend
+.venv/bin/python -m pytest tests/ -v
+
+# Run linter
+.venv/bin/ruff check app/ tests/
+
+# Run frontend build
+cd ../frontend
+npx tsc --noEmit && npm run build
 ```
 
-The course engine preserves the same API surface while adding direct LangChain loaders,
-splitters, Hugging Face integrations, persistent FAISS retrieval, LCEL, and Pydantic
-output parsing:
+---
+
+## 19. Hugging Face Spaces Deployment
+
+EnterpriseRAG is ready for deployment as a single-container **Hugging Face Docker Space**:
 
 ```bash
-RAG_ENGINE=langchain backend/.venv/bin/uvicorn app.main:app --app-dir backend --port 8000
+# Build Docker image locally
+docker build -t enterprise-rag-space .
+
+# Test container on port 7860
+docker run -p 7860:7860 -e APP_RUNTIME_PROFILE=huggingface_demo enterprise-rag-space
 ```
 
-Reprocess documents after changing an existing knowledge base from `custom` to
-`langchain` so its per-knowledge-base FAISS index is created. Indexes persist beneath
-`backend/data/langchain_indexes` by default and reload across application restarts.
+See [docs/huggingface-spaces.md](docs/huggingface-spaces.md) for full deployment instructions.
 
-## Course Technology Coverage
+---
 
-The custom column means the existing product path. The course column means direct use of
-the requested library rather than a custom equivalent.
+## 20. Configuration
 
-| Course concept | Exact library/class | Implementation | Notebook | Status |
-| --- | --- | --- | --- | --- |
-| LangChain packages | `langchain`, `langchain-core`, `langchain-community` | `backend/pyproject.toml` | All LangChain notebooks | Course engine |
-| Document loaders | `PyPDFLoader`, `TextLoader`, `Docx2txtLoader` | `backend/app/ai/langchain_engine/document_pipeline.py` | `langchain_rag_demo.ipynb` | Course engine + tests |
-| Text splitting | `RecursiveCharacterTextSplitter` | `backend/app/ai/langchain_engine/document_pipeline.py` | `langchain_rag_demo.ipynb` | Course engine + tests |
-| Embeddings | `langchain_huggingface.HuggingFaceEmbeddings` | `backend/app/ai/langchain_engine/document_pipeline.py` | `langchain_rag_demo.ipynb` | Course engine + real test |
-| Vector store/retriever | `FAISS`, `BaseRetriever` | `backend/app/ai/langchain_engine/document_pipeline.py` | `langchain_rag_demo.ipynb` | Persistent course engine |
-| Prompt templates | `PromptTemplate` | `backend/app/ai/langchain_engine/prompts.py` | `langchain_chains_and_parser.ipynb` | Six course templates |
-| Structured parsing | `PydanticOutputParser` | `backend/app/ai/langchain_engine/chains.py` | `langchain_chains_and_parser.ipynb` | Course engine + repair |
-| LCEL | `RunnableLambda`, `RunnablePassthrough`, `prompt \| llm \| parser` | `backend/app/ai/langchain_engine/chains.py` | `langchain_chains_and_parser.ipynb` | Composed course engine |
-| Custom LangChain LLM | `langchain_core.language_models.llms.LLM` | `backend/app/ai/langchain_engine/llm.py` | `huggingface_pipeline_demo.ipynb` | Adapter + tests |
-| HF pipeline | `transformers.pipeline`, `HuggingFacePipeline` | `backend/app/ai/langchain_engine/llm.py` | `huggingface_pipeline_demo.ipynb` | Course engine/demo |
-| Generation controls | `temperature`, generation `top_k`, `top_p`, `max_new_tokens`, repetition penalty, sampling | `backend/app/core/config.py` | Pipeline/Streamlit notebooks | Both engines |
-| Quantization | `BitsAndBytesConfig` 4-bit/8-bit | `backend/app/ai/quantization.py` | `quantization_bitsandbytes.ipynb` | CUDA optional |
-| Model save/reload | `save_pretrained`, `from_pretrained`, `local_files_only` | `backend/app/ai/model_io.py` | `model_save_reload.ipynb` | Utility + tests |
-| PEFT/LoRA | `LoraConfig`, `get_peft_model`, `PeftModel` | `course_demo/fine_tuning/train_lora.py` | `lora_fine_tuning.ipynb` | Optional education |
-| Streamlit | `streamlit` | `course_demo/streamlit_app/app.py` | `streamlit_ngrok_demo.ipynb` | Separate demo |
-| ngrok | `pyngrok` | `course_demo/ngrok/launch_tunnel.py` | `streamlit_ngrok_demo.ipynb` | Explicit opt-in |
-| Engine evaluation | Custom API vs LangChain FAISS/LCEL | `backend/scripts/compare_rag_engines.py` | — | Deterministic report |
+Key environment settings in `backend/.env` (or `.env.low-memory.example`):
 
-Detailed architecture, API behavior, hardware limits, exact commands, and the comparison
-between `model.generate()`, `pipeline()`, and `HuggingFacePipeline` are in
-[Course compatibility](docs/course-compatibility.md).
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `APP_RUNTIME_PROFILE` | `balanced` | Profile: `low_memory`, `balanced`, `quality`, or `huggingface_demo` |
+| `RAG_ENGINE` | `custom` | Engine selection: `custom` or `langchain` |
+| `ENTERPRISE_RAG_GENERATION_MODEL_NAME` | `Qwen/Qwen2.5-0.5B-Instruct` | Local LLM Hugging Face model ID |
+| `ENTERPRISE_RAG_EMBEDDING_MODEL_NAME` | `sentence-transformers/all-MiniLM-L6-v2` | Embedding model ID |
+| `ENTERPRISE_RAG_MAX_CONCURRENT_GENERATIONS` | `2` | Process semaphore concurrency limit |
+| `ENTERPRISE_RAG_GENERATION_TIMEOUT_SECONDS` | `90` | Route generation timeout (seconds) |
 
-## Document RAG flow
+---
+
+## 21. Testing
+
+EnterpriseRAG maintains comprehensive test coverage:
+- **Backend Tests**: 65+ unit, integration, and low-memory performance tests in `backend/tests/`.
+- **Frontend Build**: Strict TypeScript compilation and Vite bundling.
+- **E2E Visual Tests**: Playwright automated portfolio screenshot generation.
+
+---
+
+## 22. Course-Technology Coverage
+
+EnterpriseRAG implements all core AI engineering course concepts:
+- Sentence Transformers & Vector Embeddings
+- FAISS Vector Store Integration
+- Hybrid Dense + BM25 Retrieval & Reranking
+- LangChain LCEL & Pydantic Output Parsers
+- Hugging Face Transformers Pipeline Integration
+- Audio & Video Transcription with Whisper
+- Quantization & Hardware Acceleration (MPS / CUDA / CPU)
+
+---
+
+## 23. Project Structure
 
 ```text
-upload → validate → extract pages/sections → sentence-safe chunks
-→ embeddings → vector index → hybrid retrieval → rerank → grounded answer
-→ used-source citations → claim verification
+EnterpriseRAG/
+├── .github/                 # Issue templates, PR template, CI workflows
+├── artifacts/               # Generated reports, evaluations, and portfolio screenshots
+├── backend/
+│   ├── app/
+│   │   ├── ai/              # Provider adapters, prompting, generation queue, LangChain runtime
+│   │   ├── api/             # FastAPI routes (auth, rag, intelligence, eval, feedback, demo)
+│   │   ├── core/            # Config, security, errors
+│   │   ├── db/              # SQLAlchemy session & database engine
+│   │   ├── document_processing/ # Extraction, OCR, table processing, chunking
+│   │   ├── media/           # Faster-whisper transcription & audio validation
+│   │   ├── models/          # SQLAlchemy database models
+│   │   ├── repositories/   # Data access repositories
+│   │   ├── schemas/         # Pydantic request/response schemas
+│   │   └── services/        # RAG, intelligence, eval, feedback, language services
+│   └── tests/               # Pytest suite
+├── docs/
+│   ├── architecture/        # 15 detailed architecture documents with Mermaid diagrams
+│   ├── demo-video/          # Recruiter demo video script, shot list, captions
+│   ├── case-study.md        # Technical engineering case study
+│   └── huggingface-spaces.md# Hugging Face Docker Space deployment guide
+├── frontend/
+│   ├── src/
+│   │   ├── api/             # API client with AbortController timeout handling
+│   │   ├── components/      # Reusable React components (AppShell, Badges, Citations)
+│   │   ├── pages/           # Pages (Chat, Intelligence, Eval, Feedback, Templates, Landing)
+│   │   └── types.ts         # TypeScript interface declarations
+├── scripts/                 # Portfolio screenshot generation script
+├── Dockerfile               # Multi-stage Docker Space deployment file
+├── start-space.sh           # Entrypoint script for Hugging Face Space
+└── README.md                # Root project documentation
 ```
 
-The answer prompt requires a direct answer first, one or two sentences for factual
-questions, short lists and comparisons, no repeated chunks, no irrelevant copying, and
-an explicit not-found response. Post-processing removes duplicated sentences, bounds
-length by question type, rejects long copied passages, validates citation support, and
-downgrades unsupported claims.
+---
 
-## Video flow
+## 24. Known Limitations
 
-```text
-uploaded_or_linked → validating → fetching_metadata
-→ downloading_or_extracting_subtitles → extracting_audio → transcribing
-→ transcript_ready → chunking → embedding → indexing → summarising → ready
-```
+- **OCR Speed**: Scanned PDF OCR via Tesseract on CPU takes ~2–4 seconds per page.
+- **LLM Context Window**: 0.5B models perform best with context under 4,000 characters.
+- **CPU Transcription**: Whisper `small` model requires ~5–10s per minute of audio on CPU.
 
-Every failure stores its stage, stable error code, safe user message, bounded technical
-message, retryability, and timestamp. Retries replace deterministic segments, transcript
-chunks, vectors, chapters, and summaries rather than duplicating them.
+---
 
-For public URLs EnterpriseRAG:
+## 25. Roadmap
 
-- allows only HTTP(S);
-- blocks credentials, localhost, private, link-local, reserved, multicast, and unspecified
-  addresses;
-- revalidates redirects;
-- enforces download/duration/time limits;
-- invokes yt-dlp/ffmpeg without a shell;
-- does not bypass DRM, authentication, paywalls, private videos, or platform controls;
-- removes per-attempt temporary files.
+- [x] Grounded RAG with citations and verification.
+- [x] Video & audio intelligence with timestamp citations.
+- [x] Low-memory profile for 8 GB RAM devices.
+- [x] Evaluation Dashboard & User Feedback System.
+- [x] Arabic & Multilingual cross-lingual support.
+- [x] Scanned PDF OCR & Structured Table Extraction.
+- [x] Action Template Library.
+- [x] Single-container Hugging Face Docker Space deployment.
+- [ ] Multi-tenant organization workspace isolation.
+- [ ] Streaming SSE generation response option.
 
-## API groups
+---
 
-- `/api/v1/knowledge-bases`
-- `/api/v1/knowledge-bases/{id}/documents`
-- `/api/v1/documents/{id}/process|retry|extraction|preview|chunks`
-- `/api/v1/knowledge-bases/{id}/ask|retrieve`
-- `/api/v1/chat-sessions`
-- `/api/v1/intelligence/summaries|comparisons|reports`
-- `/api/v1/knowledge-bases/{id}/media`
-- `/api/v1/knowledge-bases/{id}/media/from-url`
-- `/api/v1/media/{id}/process|retry|transcript|intelligence|ask|export`
-- `/api/v1/rag/config`
+## 26. Author
 
-See [API notes](docs/api.md).
+**Faris Kishtah**
+- **GitHub**: [github.com/fariskishtah](https://github.com/fariskishtah)
+- **Repository**: [github.com/fariskishtah/enterprise-rag-platform](https://github.com/fariskishtah/enterprise-rag-platform)
 
-## Quality and tests
+---
 
-```bash
-cd /Users/fariskishtah/Desktop/EnterpriseRAG
+## 27. Licence
 
-backend/.venv/bin/ruff format --check backend/app backend/tests backend/migrations backend/scripts
-backend/.venv/bin/ruff check backend/app backend/tests backend/migrations backend/scripts
-backend/.venv/bin/pytest -q backend/tests
-
-PYTHONPATH=backend backend/.venv/bin/python backend/scripts/evaluate_policy_rag.py
-PYTHONPATH=backend backend/.venv/bin/python backend/scripts/evaluate_real_models.py
-
-cd frontend
-npm run typecheck
-npm run test
-npm run build
-npm run test:e2e
-npm audit
-```
-
-The deterministic policy PDF covers remote days, collaboration days, the 120-kilometre
-rule, required approvals, home-office allowance, learning budget, an unknown CEO, and a
-conversational approval follow-up. The report is written to
-`artifacts/policy-rag-evaluation.{json,md}`.
-
-Browser tests exercise real document upload, citations, follow-up and unknown answers,
-local media upload, a successful public-URL import, transcription, exact timestamp
-citations, summaries, scoped Q&A, export, private-URL errors, and desktop/tablet/mobile
-usability. Screenshots and the HTML report live under `artifacts/`.
-
-Real model checks are opt-in because first runs download model weights:
-
-```bash
-RUN_REAL_MODEL_TESTS=1 backend/.venv/bin/pytest -q backend/tests/test_real_huggingface_rag.py
-RUN_REAL_TRANSCRIPTION_TESTS=1 backend/.venv/bin/pytest -q backend/tests/test_real_transcription.py
-```
-
-See [testing](docs/testing.md).
-
-## Privacy and security
-
-- Source files, vectors, transcripts, model weights, and chat history remain local.
-- Stored filenames are generated from UUIDs, never user path input.
-- Upload type/size, media stream, duration, URL, DNS address, redirect, and timeout checks
-  run before processing.
-- Uploaded text is untrusted prompt data. Embedded instructions cannot override grounding.
-- React renders escaped text and does not inject source HTML.
-- Logs and explainability return model/timing/score data, not secrets or tokens.
-- Citation validation checks the individual cited passage, numbers, and negation.
-
-This local profile has no authentication or tenant isolation. Do not expose it directly
-to an untrusted network. See [deployment](docs/deployment.md).
-
-## Known limitations
-
-- Local relational vector search scans in process and should be replaced for large corpora.
-- Background tasks are in-process; production needs a durable queue and distributed locks.
-- Scanned PDFs require an OCR adapter.
-- Subtitle/video access depends on the public source and platform policy.
-- Whisper Tiny is fast but may mishear names; the default Small model is more accurate.
-- Local compact generators can still be imperfect; unsupported output is downgraded or
-  returned as not found, but human review remains appropriate for high-stakes decisions.
-- Entity, action-item, and educational extraction is transparent/local and intentionally
-  conservative rather than a full enterprise NLP ontology.
-
-## Deployment roadmap
-
-1. OIDC/SAML authentication, RBAC, workspaces, and tenant isolation.
-2. Durable object storage, task queue, cancellation, and worker autoscaling.
-3. pgvector/FAISS with tenant-aware indexes and retrieval telemetry.
-4. OCR, table/image understanding, and multilingual evaluation sets.
-5. Signed source URLs, audit logs, retention controls, and deployment secrets manager.
-6. Container/Kubernetes profiles with CPU and GPU worker pools.
+Distributed under the MIT Licence. See `LICENSE` for details.

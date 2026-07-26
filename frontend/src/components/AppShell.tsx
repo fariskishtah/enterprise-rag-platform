@@ -27,12 +27,16 @@ import { getRagConfiguration } from "../api/client";
 import type { RagConfiguration } from "../types";
 
 const navigation = [
+  { to: "/landing", label: "Product Showcase", icon: Sparkles, end: true },
   { to: "/", label: "Overview", icon: CircleGauge, end: true },
   { to: "/knowledge-bases", label: "Knowledge", icon: Boxes, end: false },
   { to: "/upload", label: "Source library", icon: FileStack, end: false },
   { to: "/chat", label: "Research chat", icon: Bot, end: false },
   { to: "/video", label: "Video intelligence", icon: Video, end: false },
   { to: "/intelligence", label: "Compare & reports", icon: FlaskConical, end: false },
+  { to: "/evaluation", label: "Evaluation", icon: CircleGauge, end: false },
+  { to: "/feedback", label: "Feedback", icon: Sparkles, end: false },
+  { to: "/templates", label: "Templates", icon: BookOpenText, end: false },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {

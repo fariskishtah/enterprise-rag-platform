@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
@@ -128,6 +129,24 @@ def create_app(
     app.add_exception_handler(RequestValidationError, request_validation_handler)
     app.add_exception_handler(StarletteHTTPException, http_error_handler)
     app.include_router(api_router, prefix=runtime_settings.api_prefix)
+
+    # Mount static assets if compiled React build is present (Hugging Face Docker Space)
+    static_dir = Path(__file__).resolve().parent / "static"
+    if static_dir.is_dir():
+        from fastapi.responses import FileResponse
+        from fastapi.staticfiles import StaticFiles
+
+        app.mount("/assets", StaticFiles(directory=static_dir / "assets"), name="static_assets")
+
+        @app.get("/{full_path:path}")
+        async def serve_spa(full_path: str) -> FileResponse:
+            if full_path.startswith("api/"):
+                raise StarletteHTTPException(status_code=404)
+            file_path = static_dir / full_path
+            if file_path.is_file():
+                return FileResponse(file_path)
+            return FileResponse(static_dir / "index.html")
+
     return app
 
 
