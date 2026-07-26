@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
@@ -9,7 +9,8 @@ from app.models.media import MediaProcessingStatus, MediaSourceKind, TranscriptJ
 class MediaUrlCreate(BaseModel):
     url: HttpUrl
     title: str | None = Field(default=None, max_length=500)
-    forced_language: str | None = Field(default=None, min_length=2, max_length=16)
+    forced_language: Literal["auto", "ar", "en"] = "auto"
+    output_language: Literal["auto", "ar", "en"] = "auto"
     auto_process: bool = True
 
 
@@ -146,6 +147,7 @@ class VideoIntelligenceRead(BaseModel):
     meeting_summary: str
     unresolved_issues: list[str]
     language: str | None
+    output_language: Literal["ar", "en"]
     generated_at: datetime
     model_name: str
 

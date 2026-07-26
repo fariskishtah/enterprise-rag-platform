@@ -19,6 +19,7 @@ import type {
   SummaryKind,
   SummaryResult,
 } from "../types";
+import { contentDirection, type OutputLanguage } from "../utils/language";
 
 type Mode = "summary" | "comparison" | "report";
 
@@ -33,12 +34,25 @@ export function IntelligencePage() {
   const [sectionIndex, setSectionIndex] = useState(0);
   const [reportTitle, setReportTitle] = useState("Knowledge Intelligence Report");
   const [objective, setObjective] = useState("");
+  const [outputLanguage, setOutputLanguage] = useState<OutputLanguage>("auto");
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [result, setResult] = useState<
     SummaryResult | ComparisonResult | ReportResult | null
   >(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!generating) return;
+    setElapsedSeconds(0);
+    const started = Date.now();
+    const timer = window.setInterval(
+      () => setElapsedSeconds(Math.floor((Date.now() - started) / 1000)),
+      1000,
+    );
+    return () => window.clearInterval(timer);
+  }, [generating]);
 
   useEffect(() => {
     listKnowledgeBases()
@@ -115,6 +129,7 @@ export function IntelligencePage() {
             documentIds: selectedIds,
             kind: summaryKind,
             sectionIndex: summaryKind === "section" ? sectionIndex : undefined,
+            outputLanguage,
           }),
         );
       } else if (mode === "comparison") {
@@ -122,6 +137,7 @@ export function IntelligencePage() {
           await compareDocuments({
             knowledgeBaseId,
             documentIds: selectedIds,
+            outputLanguage,
           }),
         );
       } else {
@@ -131,6 +147,7 @@ export function IntelligencePage() {
             documentIds: selectedIds,
             title: reportTitle,
             objective,
+            outputLanguage,
           }),
         );
       }
@@ -184,7 +201,7 @@ export function IntelligencePage() {
       </div>
 
       {error && (
-        <div className="notice error" role="alert">
+        <div className="notice error" role="alert" dir={contentDirection(error)}>
           {error}
         </div>
       )}
@@ -283,6 +300,20 @@ export function IntelligencePage() {
             </>
           )}
 
+          <label>
+            Output language
+            <select
+              aria-label="Intelligence output language"
+              value={outputLanguage}
+              onChange={(event) => setOutputLanguage(event.target.value as OutputLanguage)}
+              disabled={generating}
+            >
+              <option value="auto">Automatic</option>
+              <option value="ar">Arabic</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+
           {mode === "report" && (
             <>
               <label>
@@ -314,7 +345,7 @@ export function IntelligencePage() {
             disabled={!knowledgeBaseId || readyDocuments.length === 0 || generating}
           >
             {generating
-              ? "Running grounded analysis…"
+              ? `Running grounded analysis… ${elapsedSeconds}s`
               : mode === "summary"
                 ? "Generate summary"
                 : mode === "comparison"
@@ -332,25 +363,44 @@ export function IntelligencePage() {
           ) : "content" in result ? (
             <>
               <span className="eyebrow">Grounded summary</span>
-              <h2>{result.kind.replaceAll("_", " ")}</h2>
-              <p className="analysis-copy">{result.content}</p>
+              <h2>
+                {result.output_language === "ar"
+                  ? {
+                      whole_document: "ملخص المستند",
+                      knowledge_base: "توليف قاعدة المعرفة",
+                      section: "ملخص القسم",
+                      key_points: "النقاط الرئيسية",
+                      executive_summary: "الملخص التنفيذي",
+                    }[result.kind]
+                  : result.kind.replaceAll("_", " ")}
+              </h2>
+              <p className="analysis-copy" dir={contentDirection(result.content)}>{result.content}</p>
               <VerificationBadge verification={result.verification} />
               <CitationList citations={result.citations} />
             </>
           ) : "common_themes" in result ? (
             <>
               <span className="eyebrow">Structured comparison</span>
-              {[
-                ["Common themes", result.common_themes],
-                ["Differences", result.differences],
-                ["Contradictions", result.contradictions],
-                ["Methodologies", result.methodologies],
-                ["Conclusions", result.conclusions],
-                ["Limitations", result.limitations],
-              ].map(([title, content]) => (
+              {(result.output_language === "ar"
+                ? [
+                    ["الموضوعات المشتركة", result.common_themes],
+                    ["الاختلافات", result.differences],
+                    ["التناقضات", result.contradictions],
+                    ["المنهجيات", result.methodologies],
+                    ["الاستنتاجات", result.conclusions],
+                    ["القيود", result.limitations],
+                  ]
+                : [
+                    ["Common themes", result.common_themes],
+                    ["Differences", result.differences],
+                    ["Contradictions", result.contradictions],
+                    ["Methodologies", result.methodologies],
+                    ["Conclusions", result.conclusions],
+                    ["Limitations", result.limitations],
+                  ]).map(([title, content]) => (
                 <section className="analysis-section" key={title}>
                   <h2>{title}</h2>
-                  <p>{content}</p>
+                  <p dir={contentDirection(content)}>{content}</p>
                 </section>
               ))}
               <VerificationBadge verification={result.verification} />
@@ -370,17 +420,26 @@ export function IntelligencePage() {
                   Export Markdown
                 </button>
               </div>
-              {[
-                ["Objective", result.objective],
-                ["Executive summary", result.executive_summary],
-                ["Findings", result.findings],
-                ["Comparison", result.comparison],
-                ["Risks and limitations", result.risks_and_limitations],
-                ["Conclusions", result.conclusions],
-              ].map(([title, content]) => (
+              {(result.output_language === "ar"
+                ? [
+                    ["الهدف", result.objective],
+                    ["الملخص التنفيذي", result.executive_summary],
+                    ["النتائج", result.findings],
+                    ["المقارنة", result.comparison],
+                    ["المخاطر والقيود", result.risks_and_limitations],
+                    ["الاستنتاجات", result.conclusions],
+                  ]
+                : [
+                    ["Objective", result.objective],
+                    ["Executive summary", result.executive_summary],
+                    ["Findings", result.findings],
+                    ["Comparison", result.comparison],
+                    ["Risks and limitations", result.risks_and_limitations],
+                    ["Conclusions", result.conclusions],
+                  ]).map(([title, content]) => (
                 <section className="analysis-section" key={title}>
                   <h3>{title}</h3>
-                  <p>{content}</p>
+                  <p dir={contentDirection(content)}>{content}</p>
                 </section>
               ))}
               <VerificationBadge verification={result.verification} />
@@ -392,4 +451,3 @@ export function IntelligencePage() {
     </section>
   );
 }
-

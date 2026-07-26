@@ -24,10 +24,10 @@ from app.schemas.rag import (
     VerificationStatus,
 )
 from app.services.answer_processing import (
-    NOT_FOUND_ANSWER,
     AnswerPostProcessor,
     supporting_sources,
 )
+from app.services.language import not_found_answer, resolve_output_language
 from app.services.query_rewriting import QueryRewriteService
 from app.services.reranking import token_set
 from app.services.retrieval import RetrievalService
@@ -119,6 +119,8 @@ class RagService:
 
     def ask(self, knowledge_base_id: str, request: RagAskRequest) -> RagAnswerRead:
         started = perf_counter()
+        output_language = resolve_output_language(request.output_language, request.question)
+        absent_answer = not_found_answer(output_language)
         if KnowledgeBaseRepository(self.session).get(knowledge_base_id) is None:
             raise NotFoundError("Knowledge base")
         chat_session = self._resolve_session(
@@ -159,8 +161,8 @@ class RagService:
                 chat_session=chat_session,
                 request=request,
                 rewritten_query=rewritten_query,
-                answer=NOT_FOUND_ANSWER,
-                direct_answer=NOT_FOUND_ANSWER,
+                answer=absent_answer,
+                direct_answer=absent_answer,
                 supporting_explanation="",
                 retrieved_sources=selected,
                 citation_sources=[],
@@ -180,6 +182,7 @@ class RagService:
             conversation_context=conversation_context,
             response_mode=request.response_mode,
             resolved_question=rewritten_query,
+            output_language=output_language,
         )
         generation_started = perf_counter()
         raw_answer = self.generation_provider.generate(
@@ -197,6 +200,7 @@ class RagService:
             raw_answer=raw_answer,
             sources=selected,
             response_mode=request.response_mode,
+            output_language=output_language,
         )
         citation_sources = supporting_sources(
             processed.visible_answer,
@@ -204,13 +208,13 @@ class RagService:
             processed.cited_chunk_ids,
         )
         not_found = (
-            processed.visible_answer == NOT_FOUND_ANSWER
+            processed.visible_answer in {absent_answer, not_found_answer("en")}
             or self._is_explicit_absence(processed.visible_answer)
             or not citation_sources
             or self._is_excessive_context_copy(processed.visible_answer, citation_sources)
         )
-        answer = NOT_FOUND_ANSWER if not_found else processed.visible_answer
-        direct_answer = NOT_FOUND_ANSWER if not_found else processed.direct_answer
+        answer = absent_answer if not_found else processed.visible_answer
+        direct_answer = absent_answer if not_found else processed.direct_answer
         supporting_explanation = "" if not_found else processed.supporting_explanation
         if not_found:
             citation_sources = []
@@ -262,6 +266,10 @@ class RagService:
                 "not provided",
                 "not mentioned",
                 "not present",
+                "لا تحتوي",
+                "غير موجود",
+                "غير مذكور",
+                "لم يرد",
             )
         )
 
@@ -339,6 +347,9 @@ class RagService:
             "retrieval_quality": retrieval_quality,
             "not_found": not_found,
             "support_status": verification.claim_support.value,
+            "output_language": resolve_output_language(
+                request.output_language, request.question
+            ),
         }
         assistant = self.conversations.add_message(
             chat_session=chat_session,
@@ -404,6 +415,7 @@ class RagService:
             response_time=timings["total"],
             response_time_ms=timings["total"],
             not_found=not_found,
+            output_language=resolve_output_language(request.output_language, request.question),
             created_at=assistant.created_at,
             debug=debug,
         )

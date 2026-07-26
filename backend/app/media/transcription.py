@@ -10,6 +10,7 @@ from threading import Lock
 from typing import Any, ClassVar
 
 from app.core.errors import ProcessingError
+from app.services.language import transcription_language
 
 
 @dataclass(frozen=True)
@@ -42,7 +43,8 @@ class TranscriptionProvider(ABC):
 
 
 class FasterWhisperTranscriptionProvider(TranscriptionProvider):
-    _models: ClassVar[dict[tuple[str, str, str, str, int], Any]] = {}
+    _models: ClassVar[dict[tuple[str, str, str, str, int, int], Any]] = {}
+    _states: ClassVar[dict[tuple[str, str, str, str, int, int], str]] = {}
     _lock: ClassVar[Lock] = Lock()
 
     def __init__(
@@ -53,31 +55,45 @@ class FasterWhisperTranscriptionProvider(TranscriptionProvider):
         device: str,
         compute_type: str,
         cpu_threads: int,
+        num_workers: int = 1,
+        beam_size: int = 3,
     ) -> None:
         self._model_name = model_name
         self.cache_path = cache_path
         self.device = device
         self.compute_type = compute_type
         self.cpu_threads = cpu_threads
+        self.num_workers = num_workers
+        self.beam_size = beam_size
 
     @property
     def model_name(self) -> str:
         return f"faster-whisper/{self._model_name}"
 
-    def _load_model(self) -> Any:
-        key = (
+    def _cache_key(self) -> tuple[str, str, str, str, int, int]:
+        return (
             self._model_name,
             str(self.cache_path.resolve()),
             self.device,
             self.compute_type,
             self.cpu_threads,
+            self.num_workers,
         )
+
+    @property
+    def load_status(self) -> str:
+        key = self._cache_key()
+        return "ready" if key in self._models else self._states.get(key, "cold")
+
+    def _load_model(self) -> Any:
+        key = self._cache_key()
         if key in self._models:
             return self._models[key]
         with self._lock:
             if key in self._models:
                 return self._models[key]
             try:
+                self._states[key] = "loading"
                 from faster_whisper import WhisperModel
 
                 self.cache_path.mkdir(parents=True, exist_ok=True)
@@ -86,23 +102,27 @@ class FasterWhisperTranscriptionProvider(TranscriptionProvider):
                     device=self.device,
                     compute_type=self.compute_type,
                     cpu_threads=self.cpu_threads,
+                    num_workers=self.num_workers,
                     download_root=str(self.cache_path),
                 )
             except Exception as exc:
+                self._states[key] = "failed"
                 raise ProcessingError(
                     "The local transcription model could not be loaded. Install the media "
                     "dependencies or select a cached Whisper model.",
                     code="transcription_model_unavailable",
                 ) from exc
             self._models[key] = model
+            self._states[key] = "ready"
             return model
 
     def transcribe(self, media_path: Path, *, language: str | None = None) -> TranscriptionResult:
         try:
             raw_segments, info = self._load_model().transcribe(
                 str(media_path),
-                language=language,
-                beam_size=5,
+                language=transcription_language(language),
+                task="transcribe",
+                beam_size=self.beam_size,
                 vad_filter=True,
                 word_timestamps=False,
                 condition_on_previous_text=True,

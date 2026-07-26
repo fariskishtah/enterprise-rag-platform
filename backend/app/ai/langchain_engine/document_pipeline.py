@@ -17,6 +17,12 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.core.config import Settings
 
+LEGACY_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+
+
+class EmbeddingModelMismatchError(RuntimeError):
+    pass
+
 
 @dataclass(frozen=True)
 class DocumentIndexInput:
@@ -39,10 +45,12 @@ class LangChainDocumentPipeline:
         embeddings: Any,
         chunk_size: int,
         chunk_overlap: int,
+        embedding_model_name: str = LEGACY_EMBEDDING_MODEL,
     ) -> None:
         self.index_root = index_root.resolve()
         self.index_root.mkdir(parents=True, exist_ok=True)
         self.embeddings = embeddings
+        self.embedding_model_name = embedding_model_name
         self.splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
@@ -52,6 +60,9 @@ class LangChainDocumentPipeline:
 
     @classmethod
     def from_settings(cls, settings: Settings, *, device: str) -> LangChainDocumentPipeline:
+        uses_e5_prefixes = settings.embedding_model_name.lower().startswith(
+            "intfloat/multilingual-e5-"
+        )
         embeddings = HuggingFaceEmbeddings(
             model_name=settings.embedding_model_name,
             cache_folder=str(settings.model_cache_path),
@@ -59,11 +70,19 @@ class LangChainDocumentPipeline:
                 "device": device,
                 "local_files_only": settings.hf_local_files_only,
             },
-            encode_kwargs={"normalize_embeddings": True},
+            encode_kwargs={
+                "normalize_embeddings": True,
+                **({"prompt": "passage: "} if uses_e5_prefixes else {}),
+            },
+            query_encode_kwargs={
+                "normalize_embeddings": True,
+                **({"prompt": "query: "} if uses_e5_prefixes else {}),
+            },
         )
         return cls(
             index_root=settings.langchain_index_path,
             embeddings=embeddings,
+            embedding_model_name=settings.embedding_model_name,
             chunk_size=settings.chunk_size,
             chunk_overlap=settings.chunk_overlap,
         )
@@ -154,6 +173,25 @@ class LangChainDocumentPipeline:
         location = self._index_dir(knowledge_base_id)
         if not (location / "index.faiss").is_file() or not (location / "index.pkl").is_file():
             return None
+        manifest_path = location / "manifest.json"
+        stored_model: str | None = None
+        if manifest_path.is_file():
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                if isinstance(manifest, dict) and isinstance(
+                    manifest.get("embedding_model"), str
+                ):
+                    stored_model = manifest["embedding_model"]
+            except (OSError, json.JSONDecodeError):
+                stored_model = None
+        if stored_model is None and self.embedding_model_name != LEGACY_EMBEDDING_MODEL:
+            raise EmbeddingModelMismatchError(
+                "The legacy FAISS index has no embedding-model identity and must be reindexed."
+            )
+        if stored_model is not None and stored_model != self.embedding_model_name:
+            raise EmbeddingModelMismatchError(
+                "The FAISS index was produced by a different embedding model."
+            )
         # The pickle is generated and loaded only from EnterpriseRAG's private index root.
         return FAISS.load_local(
             str(location),
@@ -229,6 +267,7 @@ class LangChainDocumentPipeline:
                 {
                     "knowledge_base_id": knowledge_base_id,
                     "embedding_class": type(self.embeddings).__name__,
+                    "embedding_model": self.embedding_model_name,
                     "vector_count": int(store.index.ntotal),
                     "documents": documents,
                 },

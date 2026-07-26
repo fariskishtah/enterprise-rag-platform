@@ -206,6 +206,7 @@ export interface RagAnswer {
   response_time: number;
   response_time_ms: number;
   not_found: boolean;
+  output_language: "ar" | "en";
   created_at: string;
   debug: RagDebug | null;
 }
@@ -248,6 +249,7 @@ export interface SummaryResult {
   citations: Citation[];
   verification: Verification;
   model_used: string;
+  output_language: "ar" | "en";
 }
 
 export interface ComparisonResult {
@@ -263,6 +265,7 @@ export interface ComparisonResult {
   elapsed_ms?: number;
   generation_calls?: number;
   partial?: boolean;
+  output_language: "ar" | "en";
 }
 
 export interface ReportResult {
@@ -280,6 +283,7 @@ export interface ReportResult {
   elapsed_ms?: number;
   generation_calls?: number;
   partial?: boolean;
+  output_language: "ar" | "en";
 }
 
 export interface RagConfiguration {
@@ -291,6 +295,9 @@ export interface RagConfiguration {
   embedding_model_cached: boolean;
   generation_model_cached: boolean;
   model_warm: boolean;
+  embedding_model_status: "cold" | "loading" | "ready" | "failed";
+  generation_model_status: "cold" | "loading" | "ready" | "failed";
+  warmup_status: "cold" | "loading" | "ready" | "failed";
   vector_store: string;
   top_k: number;
   candidate_pool: number;
@@ -311,6 +318,7 @@ export interface RagConfiguration {
   generation_queue_active?: number;
   generation_queue_queued?: number;
   generation_timeout_seconds?: number;
+  embedding_reindex_required: boolean;
 }
 
 export type MediaStatus =
@@ -440,6 +448,7 @@ export interface VideoIntelligence {
   meeting_summary: string;
   unresolved_issues: string[];
   language: string | null;
+  output_language: "ar" | "en";
   generated_at: string;
   model_name: string;
 }

@@ -44,6 +44,7 @@ import type {
   TranscriptSegment,
   VideoIntelligence,
 } from "../types";
+import { contentDirection, type OutputLanguage } from "../utils/language";
 
 interface VideoPageProps {
   mediaId?: string;
@@ -69,6 +70,7 @@ export function VideoPage({ mediaId: routeMediaId }: VideoPageProps) {
     Number(new URLSearchParams(window.location.search).get("t") ?? 0),
   );
   const [question, setQuestion] = useState("");
+  const [answerLanguage, setAnswerLanguage] = useState<OutputLanguage>("auto");
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [answer, setAnswer] = useState<{ text: string; citations: Citation[] } | null>(null);
   const [asking, setAsking] = useState(false);
@@ -230,7 +232,12 @@ export function VideoPage({ mediaId: routeMediaId }: VideoPageProps) {
     setAsking(true);
     setError(null);
     try {
-      const result = await askMedia(selected.id, question.trim(), sessionId);
+      const result = await askMedia(
+        selected.id,
+        question.trim(),
+        sessionId,
+        answerLanguage,
+      );
       setSessionId(result.session_id);
       setAnswer({ text: result.answer, citations: result.citations });
       setQuestion("");
@@ -276,7 +283,7 @@ export function VideoPage({ mediaId: routeMediaId }: VideoPageProps) {
         </div>
       </header>
 
-      {error && <div className="notice error">{error}</div>}
+      {error && <div className="notice error" role="alert" dir={contentDirection(error)}>{error}</div>}
 
       {!selected ? (
         <EmptyState
@@ -290,7 +297,9 @@ export function VideoPage({ mediaId: routeMediaId }: VideoPageProps) {
           </span>
           <StatusBadge status={selected.status} />
           <h2>{selected.status === "failed" ? "This source needs attention." : "Building media intelligence."}</h2>
-          <p>{selected.safe_error_message ?? selected.status_message}</p>
+          <p dir={contentDirection(selected.safe_error_message ?? selected.status_message)}>
+            {selected.safe_error_message ?? selected.status_message}
+          </p>
           <div className="media-stage-line" aria-label="Media processing lifecycle">
             {["Validate", "Metadata", "Audio", "Transcript", "Index", "Summarize"].map(
               (stage, index) => (
@@ -364,7 +373,7 @@ export function VideoPage({ mediaId: routeMediaId }: VideoPageProps) {
                     onClick={() => seek(segment.start_time)}
                   >
                     <time>{formatTimestamp(segment.start_time)}</time>
-                    <span>{segment.text}</span>
+                    <span dir={contentDirection(segment.text)}>{segment.text}</span>
                   </button>
                 ))}
                 {!search.trim() &&
@@ -392,7 +401,10 @@ export function VideoPage({ mediaId: routeMediaId }: VideoPageProps) {
           </div>
 
           <div className="video-intelligence-grid">
-            <section className="intelligence-summary">
+            <section
+              className="intelligence-summary"
+              dir={contentDirection(intelligence?.detailed_summary)}
+            >
               <div className="section-heading">
                 <div><span className="eyebrow">Distilled understanding</span><h2>Summary</h2></div>
                 <Sparkles size={19} />
@@ -413,7 +425,7 @@ export function VideoPage({ mediaId: routeMediaId }: VideoPageProps) {
               {intelligence?.chapters.map((chapter) => (
                 <button key={chapter.chapter_index} onClick={() => seek(chapter.start_time)}>
                   <time>{formatTimestamp(chapter.start_time)}</time>
-                  <span><strong>{chapter.title}</strong><small>{chapter.summary}</small></span>
+                  <span dir={contentDirection(chapter.summary)}><strong>{chapter.title}</strong><small>{chapter.summary}</small></span>
                   <Play size={14} />
                 </button>
               ))}
@@ -423,9 +435,39 @@ export function VideoPage({ mediaId: routeMediaId }: VideoPageProps) {
               <div><span><ListChecks size={17} /> Action items</span><strong>{intelligence?.action_items.length ?? 0}</strong></div>
               <div><span><Target size={17} /> Decisions</span><strong>{intelligence?.decisions.length ?? 0}</strong></div>
               <div><span><Users size={17} /> Entities</span><strong>{intelligence?.entities.length ?? 0}</strong></div>
-              {intelligence?.action_items.slice(0, 3).map((value) => <p key={value.text}>{value.text}</p>)}
+              {intelligence?.action_items.slice(0, 3).map((value) => (
+                <p key={value.text} dir={contentDirection(value.text)}>{value.text}</p>
+              ))}
             </section>
           </div>
+
+          {intelligence && (
+            <section
+              className="video-generated-details"
+              dir={intelligence.output_language === "ar" ? "rtl" : "ltr"}
+            >
+              <div>
+                <span className="eyebrow">
+                  {intelligence.output_language === "ar" ? "مراجعة" : "Review"}
+                </span>
+                <h2>{intelligence.output_language === "ar" ? "أسئلة الاختبار" : "Quiz"}</h2>
+                <ol>
+                  {intelligence.quiz_questions.map((value) => <li key={value}>{value}</li>)}
+                </ol>
+              </div>
+              <div>
+                <span className="eyebrow">
+                  {intelligence.output_language === "ar" ? "مصطلحات" : "Terms"}
+                </span>
+                <h2>{intelligence.output_language === "ar" ? "مسرد" : "Glossary"}</h2>
+                <dl>
+                  {Object.entries(intelligence.glossary).map(([term, value]) => (
+                    <div key={term}><dt>{term}</dt><dd>{value}</dd></div>
+                  ))}
+                </dl>
+              </div>
+            </section>
+          )}
 
           <section className="ask-video">
             <div className="ask-video-copy">
@@ -434,12 +476,22 @@ export function VideoPage({ mediaId: routeMediaId }: VideoPageProps) {
             </div>
             {answer && (
               <div className="video-answer">
-                <p>{answer.text}</p>
+                <p dir={contentDirection(answer.text)}>{answer.text}</p>
                 <CitationList citations={answer.citations} />
               </div>
             )}
             <form onSubmit={submitQuestion}>
               <input value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="What decision did the team make?" />
+              <select
+                aria-label="Video answer language"
+                value={answerLanguage}
+                onChange={(event) => setAnswerLanguage(event.target.value as OutputLanguage)}
+                disabled={asking}
+              >
+                <option value="auto">Auto</option>
+                <option value="ar">AR</option>
+                <option value="en">EN</option>
+              </select>
               <button
                 className="send-button"
                 disabled={!question.trim() || asking}

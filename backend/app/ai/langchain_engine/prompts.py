@@ -21,8 +21,9 @@ Question:
 GROUNDED_QA_PROMPT = PromptTemplate.from_template(
     """You are a grounded enterprise knowledge assistant.
 {untrusted_context_rules}
-Answer only from the supplied blocks. If the evidence is absent, set not_found=true and
-use exactly: "The supplied documents do not contain enough information to answer this question."
+Answer only from the supplied blocks and in the language requested by the question. Preserve
+proper names, dates, numbers, percentages, and currencies exactly. If evidence is absent, set
+not_found=true and clearly say so in the requested language.
 Every factual answer must include citations copied from the matching block metadata.
 
 Question:

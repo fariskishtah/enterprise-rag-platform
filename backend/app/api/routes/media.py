@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import (
     APIRouter,
@@ -70,7 +70,10 @@ ACTIVE_MEDIA_STATUSES = {
 
 
 def run_media_processing(
-    request: Request, media_source_id: str, forced_language: str | None
+    request: Request,
+    media_source_id: str,
+    forced_language: str | None,
+    output_language: str = "auto",
 ) -> None:
     with session_scope(request.app.state.session_factory) as session:
         MediaProcessingService(
@@ -79,7 +82,11 @@ def run_media_processing(
             settings=request.app.state.settings,
             embedding_provider=request.app.state.embedding_provider,
             transcription_provider=request.app.state.transcription_provider,
-        ).process(media_source_id, forced_language=forced_language)
+        ).process(
+            media_source_id,
+            forced_language=forced_language,
+            output_language=output_language,
+        )
 
 
 @router.post(
@@ -96,13 +103,16 @@ async def upload_media(
     storage: Annotated[LocalFileStorage, Depends(get_file_storage)],
     settings: Annotated[Settings, Depends(get_runtime_settings)],
     auto_process: Annotated[bool, Form()] = True,
-    forced_language: Annotated[str | None, Form()] = None,
+    forced_language: Annotated[Literal["auto", "ar", "en"], Form()] = "auto",
+    output_language: Annotated[Literal["auto", "ar", "en"], Form()] = "auto",
 ) -> MediaSourceRead:
     source = await MediaIngestionService(
         session=session, storage=storage, settings=settings
     ).upload(knowledge_base_id, file)
     if auto_process:
-        background_tasks.add_task(run_media_processing, request, source.id, forced_language)
+        background_tasks.add_task(
+            run_media_processing, request, source.id, forced_language, output_language
+        )
     return MediaSourceRead.model_validate(source)
 
 
@@ -124,7 +134,13 @@ def link_media(
         knowledge_base_id, str(payload.url), payload.title
     )
     if payload.auto_process:
-        background_tasks.add_task(run_media_processing, request, source.id, payload.forced_language)
+        background_tasks.add_task(
+            run_media_processing,
+            request,
+            source.id,
+            payload.forced_language,
+            payload.output_language,
+        )
     return MediaSourceRead.model_validate(source)
 
 
@@ -193,6 +209,7 @@ def _queue_media(
     request: Request,
     background_tasks: BackgroundTasks,
     forced_language: str | None,
+    output_language: str,
     retry_only: bool,
 ) -> MediaSourceRead:
     if source.status in ACTIVE_MEDIA_STATUSES:
@@ -213,7 +230,9 @@ def _queue_media(
     session.commit()
     session.refresh(source)
     result = MediaSourceRead.model_validate(source)
-    background_tasks.add_task(run_media_processing, request, source.id, forced_language)
+    background_tasks.add_task(
+        run_media_processing, request, source.id, forced_language, output_language
+    )
     return result
 
 
@@ -227,7 +246,8 @@ def process_media(
     request: Request,
     background_tasks: BackgroundTasks,
     session: Annotated[Session, Depends(get_db_session)],
-    forced_language: Annotated[str | None, Query()] = None,
+    forced_language: Annotated[Literal["auto", "ar", "en"], Query()] = "auto",
+    output_language: Annotated[Literal["auto", "ar", "en"], Query()] = "auto",
 ) -> MediaSourceRead:
     return _queue_media(
         source=_get_source(session, media_source_id),
@@ -235,6 +255,7 @@ def process_media(
         request=request,
         background_tasks=background_tasks,
         forced_language=forced_language,
+        output_language=output_language,
         retry_only=False,
     )
 
@@ -249,7 +270,8 @@ def retry_media(
     request: Request,
     background_tasks: BackgroundTasks,
     session: Annotated[Session, Depends(get_db_session)],
-    forced_language: Annotated[str | None, Query()] = None,
+    forced_language: Annotated[Literal["auto", "ar", "en"], Query()] = "auto",
+    output_language: Annotated[Literal["auto", "ar", "en"], Query()] = "auto",
 ) -> MediaSourceRead:
     return _queue_media(
         source=_get_source(session, media_source_id),
@@ -257,6 +279,7 @@ def retry_media(
         request=request,
         background_tasks=background_tasks,
         forced_language=forced_language,
+        output_language=output_language,
         retry_only=True,
     )
 
@@ -348,6 +371,7 @@ def media_intelligence(
         meeting_summary=str(values.get("meeting_summary", "")),
         unresolved_issues=list(values.get("unresolved_issues", [])),
         language=source.detected_language,
+        output_language="ar" if values.get("output_language") == "ar" else "en",
         generated_at=summary.updated_at,
         model_name=summary.model_name,
     )

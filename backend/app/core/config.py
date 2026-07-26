@@ -7,7 +7,8 @@ from typing import Literal
 from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-RuntimeProfile = Literal["low_memory", "balanced", "quality"]
+RuntimeProfile = Literal["low_memory", "balanced", "quality", "aws_cpu", "huggingface_demo"]
+LanguageMode = Literal["auto", "ar", "en"]
 
 
 class Settings(BaseSettings):
@@ -38,6 +39,7 @@ class Settings(BaseSettings):
     max_media_duration_seconds: int = Field(default=4 * 60 * 60, ge=1)
     media_download_timeout_seconds: int = Field(default=120, ge=5, le=3600)
     media_processing_timeout_seconds: int = Field(default=1800, ge=30, le=7200)
+    ytdlp_cookies_file: Path | None = None
     cors_origins: list[str] = ["http://localhost:5173"]
     chunk_size: int = Field(default=800, ge=128, le=8000)
     chunk_overlap: int = Field(default=120, ge=0, le=2000)
@@ -72,17 +74,37 @@ class Settings(BaseSettings):
     generation_temperature: float = Field(default=0.1, ge=0.0, le=2.0)
     generation_top_k: int = Field(default=50, ge=0, le=1000)
     generation_top_p: float = Field(default=0.9, gt=0.0, le=1.0)
-    generation_max_new_tokens: int = Field(default=256, ge=32, le=2048)
+    generation_max_new_tokens: int = Field(
+        default=256,
+        ge=32,
+        le=2048,
+        validation_alias=AliasChoices(
+            "generation_max_new_tokens",
+            "ENTERPRISE_RAG_GENERATION_MAX_NEW_TOKENS",
+            "ENTERPRISE_RAG_MAXIMUM_NEW_TOKENS",
+        ),
+    )
     generation_repetition_penalty: float = Field(default=1.0, ge=1.0, le=5.0)
     generation_do_sample: bool = True
     langchain_parser_retries: int = Field(default=1, ge=0, le=3)
-    max_context_characters: int = Field(default=12000, ge=1000, le=100000)
+    max_context_characters: int = Field(
+        default=12000,
+        ge=1000,
+        le=100000,
+        validation_alias=AliasChoices(
+            "max_context_characters",
+            "ENTERPRISE_RAG_MAX_CONTEXT_CHARACTERS",
+            "ENTERPRISE_RAG_MAXIMUM_CONTEXT_CHARACTERS",
+        ),
+    )
     conversation_history_messages: int = Field(default=6, ge=0, le=20)
-    transcription_model_name: str = "small"
-    transcription_device: str = "cpu"
-    transcription_compute_type: str = "int8"
-    transcription_language: str | None = None
+    transcription_model_name: Literal["tiny", "base", "small"] = "small"
+    transcription_device: Literal["cpu"] = "cpu"
+    transcription_compute_type: Literal["int8"] = "int8"
+    transcription_language: LanguageMode = "auto"
     transcription_cpu_threads: int = Field(default=4, ge=1, le=64)
+    transcription_num_workers: int = Field(default=1, ge=1, le=4)
+    transcription_beam_size: int = Field(default=3, ge=1, le=5)
 
     # ── Runtime profile ──────────────────────────────────────────────────
     runtime_profile: RuntimeProfile = Field(
@@ -114,6 +136,11 @@ class Settings(BaseSettings):
     # ── Model lifecycle ──────────────────────────────────────────────────
     model_idle_unload_seconds: int = Field(default=0, ge=0, le=7200)
     langchain_force_wrapper: bool = False
+    warm_models_on_startup: bool = False
+    warm_generation_model_on_startup: bool = True
+    torch_num_threads: int = Field(default=2, ge=1, le=16)
+    torch_num_interop_threads: int = Field(default=1, ge=1, le=8)
+    query_embedding_cache_size: int = Field(default=128, ge=0, le=2048)
 
     @field_validator("generation_quantization", mode="before")
     @classmethod
@@ -163,6 +190,23 @@ class Settings(BaseSettings):
             _apply_if_default(self, "langchain_parser_retries", 0, 1)
             _apply_if_default(self, "langchain_force_wrapper", True, False)
             _apply_if_default(self, "conversation_history_messages", 4, 6)
+        elif self.runtime_profile in {"aws_cpu", "huggingface_demo"}:
+            _apply_if_default(self, "max_concurrent_generations", 1, 2)
+            _apply_if_default(self, "generation_max_new_tokens", 96, 256)
+            _apply_if_default(self, "max_context_characters", 3000, 12000)
+            _apply_if_default(self, "retrieval_top_k", 3, 5)
+            _apply_if_default(self, "retrieval_candidate_pool", 12, 40)
+            _apply_if_default(self, "generation_timeout_seconds", 120, 90)
+            _apply_if_default(self, "generation_queue_timeout_seconds", 180, 120)
+            _apply_if_default(self, "summary_timeout_seconds", 180, 60)
+            _apply_if_default(self, "generation_do_sample", False, True)
+            _apply_if_default(self, "generation_temperature", 0.0, 0.1)
+            _apply_if_default(self, "transcription_model_name", "base", "small")
+            _apply_if_default(self, "transcription_cpu_threads", 2, 4)
+            _apply_if_default(self, "embedding_batch_size", 8, 32)
+            _apply_if_default(self, "langchain_parser_retries", 0, 1)
+            _apply_if_default(self, "langchain_force_wrapper", True, False)
+            object.__setattr__(self, "model_device", "cpu")
         elif self.runtime_profile == "quality":
             _apply_if_default(self, "max_concurrent_generations", 4, 2)
             _apply_if_default(self, "generation_max_new_tokens", 512, 256)

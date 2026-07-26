@@ -244,6 +244,7 @@ test.describe("production container smoke", () => {
           response_time: 1,
           response_time_ms: 1,
           not_found: false,
+          output_language: "en",
           created_at: new Date().toISOString(),
           debug: null,
         }),
@@ -291,6 +292,107 @@ test.describe("production container smoke", () => {
     await expect(page.getByRole("button", { name: "Load Demo Workspace" })).toBeEnabled();
     await expect(page).toHaveURL(/\/landing\/?$/);
 
+    expectCleanDiagnostics(diagnostics);
+  });
+
+  test("Arabic controls, RTL answers, and YouTube auth errors terminate cleanly", async ({
+    page,
+  }) => {
+    const diagnostics = collectDiagnostics(page);
+    const workspace = await page.request.post("/api/v1/knowledge-bases", {
+      data: {
+        name: `Arabic production smoke ${Date.now()}`,
+        description: "Multilingual production validation",
+      },
+    });
+    expect(workspace.status()).toBe(201);
+    const knowledgeBase = (await workspace.json()) as { id: string };
+
+    let askPayload: Record<string, unknown> | null = null;
+    await page.route("**/api/v1/knowledge-bases/*/ask", async (route) => {
+      askPayload = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          session_id: "arabic-smoke-session",
+          message_id: "arabic-smoke-message",
+          answer: "يسمح بالعمل عن بُعد ثلاثة أيام أسبوعياً.",
+          direct_answer: "ثلاثة أيام أسبوعياً.",
+          supporting_explanation: "",
+          citations: [],
+          retrieved_sources: [],
+          verification: {
+            status: "supported",
+            claim_support: "fully_supported",
+            explanation: "الإجابة مدعومة بالمصدر.",
+            unsupported_statements: [],
+          },
+          retrieval_quality: "high",
+          confidence: 1,
+          support_status: "fully_supported",
+          retrieved_chunk_ids: [],
+          generation_model: "smoke",
+          model_used: "smoke",
+          response_time: 1,
+          response_time_ms: 1,
+          not_found: false,
+          output_language: "ar",
+          created_at: new Date().toISOString(),
+          debug: null,
+        }),
+      });
+    });
+    await page.goto(`/chat?knowledgeBase=${knowledgeBase.id}`);
+    await page.getByLabel("Answer language").selectOption("ar");
+    await page.getByLabel("Ask a grounded question").fill("ما سياسة العمل عن بُعد؟");
+    await page.getByLabel("Ask sources").click();
+    const answer = page.getByText("يسمح بالعمل عن بُعد ثلاثة أيام أسبوعياً.");
+    await expect(answer).toBeVisible();
+    await expect(answer).toHaveAttribute("dir", "rtl");
+    expect(askPayload?.output_language).toBe("ar");
+
+    const terminalMessage =
+      "YouTube requires authenticated cookies on this server. Update the server cookie file or upload the media file directly.";
+    await page.route("**/api/v1/knowledge-bases/*/media/from-url", (route) =>
+      route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: "yt-auth-smoke",
+          knowledge_base_id: knowledgeBase.id,
+          title: "YouTube auth smoke",
+          status: "validating",
+          status_message: "Validating media source.",
+        }),
+      }),
+    );
+    await page.route("**/api/v1/media/yt-auth-smoke", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: "yt-auth-smoke",
+          knowledge_base_id: knowledgeBase.id,
+          title: "YouTube auth smoke",
+          status: "failed",
+          status_message: terminalMessage,
+          safe_error_message: terminalMessage,
+          error_code: "youtube_authentication_required",
+          retryable: true,
+        }),
+      }),
+    );
+    await page.goto(`/upload?knowledgeBase=${knowledgeBase.id}`);
+    await page.getByLabel("Transcription language").selectOption("ar");
+    await page.getByLabel("Media intelligence language").selectOption("ar");
+    await page.getByRole("tab", { name: "Video link" }).click();
+    await page.getByLabel("Public media URL").fill("https://www.youtube.com/watch?v=smoke");
+    await page.getByRole("button", { name: "Import" }).click();
+    await expect(page.getByRole("alert")).toContainText(terminalMessage);
+    await expect(page.getByLabel("Public media URL")).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Import" })).toBeVisible();
+    await expect(page.getByText("Pipeline in motion")).toHaveCount(0);
     expectCleanDiagnostics(diagnostics);
   });
 });

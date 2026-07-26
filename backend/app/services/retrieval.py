@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from time import perf_counter
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.ai.interfaces import EmbeddingProvider
 from app.ai.vectorstores.base import VectorSearchResult
 from app.ai.vectorstores.relational import RelationalVectorStore
 from app.core.config import Settings
-from app.core.errors import NotFoundError
+from app.core.errors import ConflictError, NotFoundError
+from app.models.document import DocumentChunk
 from app.repositories.knowledge_bases import KnowledgeBaseRepository
 from app.services.reranking import HybridReranker
 
@@ -38,12 +40,35 @@ class RetrievalService:
         if KnowledgeBaseRepository(self.session).get(knowledge_base_id) is None:
             raise NotFoundError("Knowledge base")
         started = perf_counter()
+        model_statement = select(DocumentChunk.embedding_model).where(
+            DocumentChunk.knowledge_base_id == knowledge_base_id,
+            DocumentChunk.embedding.is_not(None),
+            DocumentChunk.indexed_at.is_not(None),
+        )
+        if source_document_ids:
+            model_statement = model_statement.where(
+                DocumentChunk.document_id.in_(source_document_ids)
+            )
+        indexed_models = {
+            value
+            for value in self.session.scalars(model_statement).all()
+            if isinstance(value, str) and value
+        }
+        if indexed_models - {self.embedding_provider.model_name}:
+            raise ConflictError(
+                code="embedding_model_reindex_required",
+                message=(
+                    "The embedding model changed. Reindex the selected documents before "
+                    "searching so vectors from different models are never mixed."
+                ),
+            )
         query_embedding = self.embedding_provider.embed_query(query)
         requested_top_k = top_k or self.settings.retrieval_top_k
-        candidate_pool = max(self.settings.retrieval_candidate_pool, requested_top_k * 8)
+        candidate_pool = max(self.settings.retrieval_candidate_pool, requested_top_k)
         candidates = self.vector_store.search(
             knowledge_base_id=knowledge_base_id,
             query_embedding=query_embedding,
+            model_name=self.embedding_provider.model_name,
             top_k=candidate_pool,
             similarity_threshold=-1.0,
         )

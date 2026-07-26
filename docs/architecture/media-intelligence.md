@@ -22,7 +22,7 @@ flowchart TD
     subgraph Transcription ["Whisper Engine"]
         SUBTITLE_CHECK{"Subtitles Available?"}
         PARSER["VTT / SRT Subtitle Parser"]
-        WHISPER["faster-whisper Small Model (CPU int8)"]
+        WHISPER["faster-whisper tiny/base/small (CPU int8)"]
     end
 
     subgraph Intelligence ["Indexing & Chapter Analysis"]
@@ -47,3 +47,10 @@ flowchart TD
 - **Interactive Player Sync**: Clicking a citation timestamp jumps video playback directly to that position.
 - **Transcript Search**: Instant lexical search over full video transcripts.
 - **Export Options**: Export transcripts to Markdown, TXT, or JSON formats.
+- **Arabic/English Modes**: Automatic language detection is the default; `ar` and `en` can
+  be forced before transcription. The task is always transcription, never implicit translation.
+- **Bounded CPU Work**: VAD, beam size, worker count, and CPU threads are bounded. The AWS
+  profile recommends `base`; `small` remains available for higher Arabic accuracy.
+- **Optional YouTube Cookies**: yt-dlp receives a readable configured Netscape cookie file
+  through its Python API. Authentication failures become a safe terminal error, while direct
+  media upload remains available. Cookie data and secret paths are never exposed.

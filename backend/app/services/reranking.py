@@ -9,7 +9,7 @@ from difflib import SequenceMatcher
 from app.ai.vectorstores.base import VectorSearchResult
 from app.core.config import Settings
 
-TOKEN_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9'_-]*")
+TOKEN_PATTERN = re.compile(r"[^\W_][\w'’-]*", re.UNICODE)
 STOPWORDS = {
     "a",
     "about",
@@ -42,11 +42,25 @@ STOPWORDS = {
     "which",
     "who",
     "with",
+    "أن",
+    "إلى",
+    "في",
+    "من",
+    "على",
+    "عن",
+    "ما",
+    "ماذا",
+    "متى",
+    "هل",
+    "هو",
+    "هي",
+    "هذا",
+    "هذه",
 }
 
 
 def normalized_tokens(text: str, *, keep_stopwords: bool = False) -> list[str]:
-    tokens = [token.lower().strip("'_-") for token in TOKEN_PATTERN.findall(text)]
+    tokens = [token.lower().strip("'’-") for token in TOKEN_PATTERN.findall(text)]
     if keep_stopwords:
         return [token for token in tokens if token]
     return [token for token in tokens if token and token not in STOPWORDS and len(token) > 1]

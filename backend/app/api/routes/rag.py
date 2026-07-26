@@ -1,8 +1,8 @@
-import asyncio
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.ai.generation_queue import GenerationQueue
@@ -16,7 +16,8 @@ from app.api.dependencies import (
     get_runtime_settings,
 )
 from app.core.config import Settings
-from app.core.errors import GenerationTimeoutError, NotFoundError
+from app.core.errors import GenerationQueueFullError, GenerationTimeoutError, NotFoundError
+from app.models.document import DocumentChunk
 from app.repositories.conversations import ConversationRepository
 from app.repositories.knowledge_bases import KnowledgeBaseRepository
 from app.schemas.conversation import (
@@ -61,22 +62,27 @@ async def ask_knowledge_base(
     generation_queue: Annotated[GenerationQueue, Depends(get_generation_queue)],
 ) -> RagAnswerRead:
     try:
-        async with await generation_queue.acquire(
+        slot = await generation_queue.acquire(
             timeout=settings.generation_queue_timeout_seconds,
-        ):
-            return await asyncio.wait_for(
-                asyncio.to_thread(
-                    _run_ask,
-                    knowledge_base_id,
-                    payload,
-                    request,
-                    session,
-                    settings,
-                    embedding_provider,
-                    generation_provider,
-                ),
-                timeout=settings.generation_timeout_seconds,
-            )
+        )
+    except TimeoutError as exc:
+        raise GenerationQueueFullError(
+            "The server is busy with another model request. Please retry shortly."
+        ) from exc
+    try:
+        return await generation_queue.execute(
+            slot,
+            lambda: _run_ask(
+                knowledge_base_id,
+                payload,
+                request,
+                session,
+                settings,
+                embedding_provider,
+                generation_provider,
+            ),
+            timeout=settings.generation_timeout_seconds,
+        )
     except TimeoutError as exc:
         raise GenerationTimeoutError(
             "The answer could not be generated in time. "
@@ -142,12 +148,27 @@ def debug_retrieval(
 @router.get("/rag/config", response_model=RagConfigurationRead)
 def rag_configuration(
     request: Request,
+    session: Annotated[Session, Depends(get_db_session)],
     settings: Annotated[Settings, Depends(get_runtime_settings)],
     embedding_provider: Annotated[EmbeddingProvider, Depends(get_embedding_provider)],
     generation_provider: Annotated[GenerationProvider, Depends(get_generation_provider)],
     generation_queue: Annotated[GenerationQueue, Depends(get_generation_queue)],
 ) -> RagConfigurationRead:
     queue_stats = generation_queue.stats
+    indexed_models = {
+        value
+        for value in session.scalars(
+            select(DocumentChunk.embedding_model).where(
+                DocumentChunk.embedding.is_not(None),
+                DocumentChunk.indexed_at.is_not(None),
+            )
+        ).all()
+        if isinstance(value, str) and value
+    }
+    embedding_status = str(getattr(embedding_provider, "load_status", "cold"))
+    generation_status = str(getattr(generation_provider, "load_status", "cold"))
+    models_ready = embedding_status == "ready" and generation_status == "ready"
+    warmup_status = "ready" if models_ready else request.app.state.model_warmup.status
     return RagConfigurationRead(
         embedding_model=settings.embedding_model_name,
         generation_model=settings.generation_model_name,
@@ -160,6 +181,9 @@ def rag_configuration(
             getattr(embedding_provider, "is_loaded", False)
             and getattr(generation_provider, "is_loaded", False)
         ),
+        embedding_model_status=embedding_status,
+        generation_model_status=generation_status,
+        warmup_status=warmup_status,
         vector_store=(
             "langchain-faiss" if settings.rag_engine == "langchain" else "relational-float32"
         ),
@@ -190,7 +214,29 @@ def rag_configuration(
         generation_queue_active=queue_stats.active,
         generation_queue_queued=queue_stats.queued,
         generation_timeout_seconds=settings.generation_timeout_seconds,
+        embedding_reindex_required=bool(
+            indexed_models - {settings.embedding_model_name}
+        ),
     )
+
+
+@router.post("/rag/warmup", status_code=status.HTTP_202_ACCEPTED)
+def warm_models(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    settings: Annotated[Settings, Depends(get_runtime_settings)],
+    embedding_provider: Annotated[EmbeddingProvider, Depends(get_embedding_provider)],
+    generation_provider: Annotated[GenerationProvider, Depends(get_generation_provider)],
+) -> dict[str, str]:
+    controller = request.app.state.model_warmup
+    if controller.begin():
+        background_tasks.add_task(
+            controller.run,
+            embedding_provider,
+            generation_provider,
+            settings,
+        )
+    return {"status": controller.status}
 
 
 @router.post(

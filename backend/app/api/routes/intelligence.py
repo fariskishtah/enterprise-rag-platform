@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from typing import Annotated
 
@@ -14,7 +13,7 @@ from app.api.dependencies import (
     get_runtime_settings,
 )
 from app.core.config import Settings
-from app.core.errors import GenerationTimeoutError
+from app.core.errors import GenerationQueueFullError, GenerationTimeoutError
 from app.schemas.intelligence import (
     ComparisonRead,
     ComparisonRequest,
@@ -43,14 +42,17 @@ async def create_summary(
     generation_queue: Annotated[GenerationQueue, Depends(get_generation_queue)],
 ) -> SummaryRead:
     try:
-        q_timeout = settings.generation_queue_timeout_seconds
-        async with await generation_queue.acquire(timeout=q_timeout):
-            return await asyncio.wait_for(
-                asyncio.to_thread(
-                    _run_summary, session, settings, generation_provider, payload
-                ),
-                timeout=settings.summary_timeout_seconds,
-            )
+        slot = await generation_queue.acquire(timeout=settings.generation_queue_timeout_seconds)
+    except TimeoutError as exc:
+        raise GenerationQueueFullError(
+            "The server is busy with another model request. Please retry shortly."
+        ) from exc
+    try:
+        return await generation_queue.execute(
+            slot,
+            lambda: _run_summary(session, settings, generation_provider, payload),
+            timeout=settings.summary_timeout_seconds,
+        )
     except TimeoutError as exc:
         raise GenerationTimeoutError(
             "Summary generation timed out. Try a shorter document or fewer sources."
@@ -66,14 +68,17 @@ async def compare_documents(
     generation_queue: Annotated[GenerationQueue, Depends(get_generation_queue)],
 ) -> ComparisonRead:
     try:
-        q_timeout = settings.generation_queue_timeout_seconds
-        async with await generation_queue.acquire(timeout=q_timeout):
-            return await asyncio.wait_for(
-                asyncio.to_thread(
-                    _run_comparison, session, settings, generation_provider, payload
-                ),
-                timeout=settings.comparison_timeout_seconds,
-            )
+        slot = await generation_queue.acquire(timeout=settings.generation_queue_timeout_seconds)
+    except TimeoutError as exc:
+        raise GenerationQueueFullError(
+            "The server is busy with another model request. Please retry shortly."
+        ) from exc
+    try:
+        return await generation_queue.execute(
+            slot,
+            lambda: _run_comparison(session, settings, generation_provider, payload),
+            timeout=settings.comparison_timeout_seconds,
+        )
     except TimeoutError as exc:
         raise GenerationTimeoutError(
             "Comparison timed out. Try comparing fewer documents or narrower topics."
@@ -89,21 +94,24 @@ async def create_report(
     generation_queue: Annotated[GenerationQueue, Depends(get_generation_queue)],
 ) -> ResearchReportRead:
     try:
-        q_timeout = settings.generation_queue_timeout_seconds
-        async with await generation_queue.acquire(timeout=q_timeout):
-            return await asyncio.wait_for(
-                asyncio.to_thread(
-                    _run_report, session, settings, generation_provider, payload
-                ),
-                timeout=settings.report_timeout_seconds,
-            )
+        slot = await generation_queue.acquire(timeout=settings.generation_queue_timeout_seconds)
+    except TimeoutError as exc:
+        raise GenerationQueueFullError(
+            "The server is busy with another model request. Please retry shortly."
+        ) from exc
+    try:
+        return await generation_queue.execute(
+            slot,
+            lambda: _run_report(session, settings, generation_provider, payload),
+            timeout=settings.report_timeout_seconds,
+        )
     except TimeoutError as exc:
         raise GenerationTimeoutError(
             "Report generation timed out. Try a narrower objective or fewer source documents."
         ) from exc
 
 
-# ── Synchronous service runners (executed via asyncio.to_thread) ─────
+# ── Synchronous service runners (executed through GenerationQueue) ──
 
 
 def _run_summary(

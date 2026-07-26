@@ -27,6 +27,7 @@ import {
   askKnowledgeBase,
   deleteChatSession,
   getChatSession,
+  getRagConfiguration,
   listChatSessions,
   listKnowledgeBases,
 } from "../api/client";
@@ -42,6 +43,7 @@ import type {
   RetrievedSource,
   Verification,
 } from "../types";
+import { contentDirection, type OutputLanguage } from "../utils/language";
 
 interface DisplayMessage {
   id: string;
@@ -91,12 +93,34 @@ export function ChatPage() {
   const [question, setQuestion] = useState(parameters.get("question") ?? "");
   const [debug, setDebug] = useState(false);
   const [responseMode, setResponseMode] = useState<"concise" | "detailed">("concise");
+  const [outputLanguage, setOutputLanguage] = useState<OutputLanguage>("auto");
+  const [modelStatus, setModelStatus] = useState<"cold" | "loading" | "ready" | "failed">(
+    "cold",
+  );
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [asking, setAsking] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    getRagConfiguration()
+      .then((configuration) => setModelStatus(configuration.generation_model_status))
+      .catch(() => setModelStatus("failed"));
+  }, []);
+
+  useEffect(() => {
+    if (!asking) return;
+    setElapsedSeconds(0);
+    const started = Date.now();
+    const timer = window.setInterval(
+      () => setElapsedSeconds(Math.floor((Date.now() - started) / 1000)),
+      1000,
+    );
+    return () => window.clearInterval(timer);
+  }, [asking]);
 
   useEffect(() => {
     listKnowledgeBases()
@@ -162,6 +186,7 @@ export function ChatPage() {
         sessionId: sessionId ?? undefined,
         debug: debug || evidenceOpen,
         responseMode,
+        outputLanguage,
       });
       setSessionId(answer.session_id);
       setMessages((current) => [
@@ -180,6 +205,9 @@ export function ChatPage() {
         },
       ]);
       await loadSessions();
+      getRagConfiguration()
+        .then((configuration) => setModelStatus(configuration.generation_model_status))
+        .catch(() => undefined);
     } catch (reason) {
       setMessages((current) => current.filter((message) => message.id !== temporaryId));
       setQuestion(value);
@@ -259,11 +287,20 @@ export function ChatPage() {
               ))}
             </select>
           </label>
-          <span className="model-state"><span /> Local model ready</span>
+          <span className="model-state">
+            <span />
+            {asking && modelStatus !== "ready"
+              ? `Loading model for the first request · ${elapsedSeconds}s`
+              : modelStatus === "ready"
+                ? "Local model ready"
+                : modelStatus === "failed"
+                  ? "Model unavailable"
+                  : "Local model cold"}
+          </span>
         </div>
       </header>
 
-      {error && <div className="notice error" role="alert">{error}</div>}
+      {error && <div className="notice error" role="alert" dir={contentDirection(error)}>{error}</div>}
 
       <div className={`research-layout ${evidenceOpen ? "evidence-visible" : ""}`}>
         <aside className="session-rail">
@@ -341,7 +378,7 @@ export function ChatPage() {
                     <strong>{message.role === "user" ? "You" : "EnterpriseRAG"}</strong>
                   </div>
                   <div className="message-body">
-                    <p>{message.content}</p>
+                    <p dir={contentDirection(message.content)}>{message.content}</p>
                     {message.role === "assistant" && (
                       <>
                         <div className="answer-toolbar">
@@ -378,8 +415,12 @@ export function ChatPage() {
                 <div className="thinking-state">
                   <span className="thinking-orb" />
                   <span>
-                    <strong>Reading the strongest evidence…</strong>
-                    <small>Hybrid retrieval · reranking · claim verification</small>
+                    <strong>
+                      {modelStatus === "ready"
+                        ? "Reading the strongest evidence…"
+                        : "Loading model for the first request…"}
+                    </strong>
+                    <small>Hybrid retrieval · reranking · claim verification · {elapsedSeconds}s</small>
                   </span>
                   <CircleStop size={16} />
                 </div>
@@ -427,6 +468,19 @@ export function ChatPage() {
                 >
                   <FileSearch size={13} /> Explain
                 </button>
+                <label className="language-select">
+                  <span>Answer</span>
+                  <select
+                    aria-label="Answer language"
+                    value={outputLanguage}
+                    onChange={(event) => setOutputLanguage(event.target.value as OutputLanguage)}
+                    disabled={asking}
+                  >
+                    <option value="auto">Automatic</option>
+                    <option value="ar">Arabic</option>
+                    <option value="en">English</option>
+                  </select>
+                </label>
               </div>
               <button
                 className="send-button"
@@ -475,7 +529,7 @@ export function ChatPage() {
                             <strong>{source.document_name}</strong>
                             <em>{source.score.toFixed(3)}</em>
                           </summary>
-                          <p>{source.text}</p>
+                          <p dir={contentDirection(source.text)}>{source.text}</p>
                           <small>
                             dense {source.dense_score.toFixed(2)} · lexical {source.lexical_score.toFixed(2)} · rerank {source.reranking_score.toFixed(2)}
                           </small>

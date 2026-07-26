@@ -1,4 +1,8 @@
 import "@testing-library/jest-dom/vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach } from "vitest";
+
+afterEach(() => cleanup());
 
 // Node can expose an incomplete localStorage object when its storage-file flag
 // is unset. Keep browser-facing tests deterministic with a standards-shaped

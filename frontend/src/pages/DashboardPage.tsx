@@ -268,7 +268,9 @@ export function DashboardPage() {
               <dd>
                 {configuration
                   ? `${configuration.model_device.toUpperCase()} · ${
-                      configuration.model_warm
+                      configuration.warmup_status === "loading"
+                        ? "warming"
+                        : configuration.model_warm
                         ? "warm"
                         : configuration.generation_model_cached
                           ? "cached"

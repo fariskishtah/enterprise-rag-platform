@@ -192,7 +192,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span className="pulse-orbit" aria-hidden="true" />
           <span>
             <strong>
-              {modelConfiguration?.model_warm
+              {modelConfiguration?.warmup_status === "loading"
+                ? "Loading local models"
+                : modelConfiguration?.model_warm
                 ? "Local models warm"
                 : modelConfiguration?.embedding_model_cached &&
                     modelConfiguration.generation_model_cached

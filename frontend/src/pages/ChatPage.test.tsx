@@ -9,6 +9,7 @@ vi.mock("../api/client", () => ({
   askKnowledgeBase: (...args: unknown[]) => askKnowledgeBase(...args),
   deleteChatSession: vi.fn(),
   getChatSession: vi.fn(),
+  getRagConfiguration: vi.fn().mockResolvedValue({ generation_model_status: "ready" }),
   listChatSessions: vi.fn().mockResolvedValue([]),
   listKnowledgeBases: vi.fn().mockResolvedValue({
     items: [
@@ -51,6 +52,7 @@ describe("ChatPage", () => {
       response_time: 12,
       response_time_ms: 12,
       not_found: false,
+      output_language: "en",
       created_at: "2026-01-01T00:00:00Z",
       debug: null,
     });
@@ -75,6 +77,51 @@ describe("ChatPage", () => {
         knowledgeBaseId: "kb-1",
         responseMode: "concise",
       }),
+    );
+  });
+
+  it("requests Arabic output and renders the answer right-to-left", async () => {
+    askKnowledgeBase.mockResolvedValueOnce({
+      session_id: "session-ar",
+      message_id: "message-ar",
+      answer: "يسمح للموظفين بالعمل عن بُعد ثلاثة أيام أسبوعياً.",
+      direct_answer: "ثلاثة أيام أسبوعياً.",
+      supporting_explanation: "",
+      citations: [],
+      retrieved_sources: [],
+      verification: {
+        status: "supported",
+        claim_support: "fully_supported",
+        explanation: "الإجابة مدعومة بالمصدر.",
+        unsupported_statements: [],
+      },
+      retrieval_quality: "high",
+      confidence: 0.9,
+      support_status: "fully_supported",
+      retrieved_chunk_ids: ["chunk-ar"],
+      generation_model: "local-test",
+      model_used: "local-test",
+      response_time: 15,
+      response_time_ms: 15,
+      not_found: false,
+      output_language: "ar",
+      created_at: "2026-01-01T00:00:00Z",
+      debug: null,
+    });
+    render(<ChatPage />);
+    fireEvent.change(await screen.findByLabelText("Answer language"), {
+      target: { value: "ar" },
+    });
+    const composer = screen.getByLabelText("Ask a grounded question");
+    fireEvent.change(composer, { target: { value: "ما سياسة العمل عن بُعد؟" } });
+    fireEvent.keyDown(composer, { key: "Enter" });
+
+    const answer = await screen.findByText(
+      "يسمح للموظفين بالعمل عن بُعد ثلاثة أيام أسبوعياً.",
+    );
+    expect(answer).toHaveAttribute("dir", "rtl");
+    expect(askKnowledgeBase).toHaveBeenCalledWith(
+      expect.objectContaining({ outputLanguage: "ar" }),
     );
   });
 });

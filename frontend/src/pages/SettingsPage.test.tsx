@@ -7,6 +7,7 @@ const getRagConfiguration = vi.fn();
 
 vi.mock("../api/client", () => ({
   getRagConfiguration: (...args: unknown[]) => getRagConfiguration(...args),
+  warmModels: vi.fn(),
 }));
 
 describe("SettingsPage", () => {

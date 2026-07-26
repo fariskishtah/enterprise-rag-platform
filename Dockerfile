@@ -33,7 +33,9 @@ COPY backend/app /workspace/backend/app
 # index pulls the full CUDA runtime on Linux, even for CPU-only hosts.
 ARG PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir 'torch>=2.7,<3.0' --index-url "${PYTORCH_INDEX_URL}"
-RUN pip install --no-cache-dir -e '/workspace/backend[dev,media]'
+# Development-only tools (pytest, Ruff, Streamlit course demo) stay in CI and are
+# intentionally excluded from the deployed React/FastAPI runtime.
+RUN pip install --no-cache-dir -e '/workspace/backend[media]'
 
 # Copy frontend static build artifacts into backend static directory
 COPY --from=frontend-builder /build/dist /workspace/backend/app/static
@@ -45,6 +47,8 @@ RUN chmod +x /workspace/start-space.sh
 # Environment settings for Hugging Face Docker Space
 ENV APP_RUNTIME_PROFILE=huggingface_demo \
     PYTHONUNBUFFERED=1 \
+    CUDA_VISIBLE_DEVICES="" \
+    TOKENIZERS_PARALLELISM=false \
     PORT=7860 \
     ENTERPRISE_RAG_DATABASE_URL=sqlite:////tmp/enterprise_rag.db \
     ENTERPRISE_RAG_STORAGE_PATH=/tmp/uploads \

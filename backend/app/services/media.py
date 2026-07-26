@@ -7,7 +7,6 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 import uuid
 from datetime import UTC, datetime
@@ -53,6 +52,7 @@ from app.models.media import (
 from app.repositories.documents import DocumentRepository
 from app.repositories.knowledge_bases import KnowledgeBaseRepository
 from app.repositories.media import MediaRepository
+from app.services.language import resolve_output_language, transcription_language
 from app.services.storage import LocalFileStorage
 
 STAGE_NUMBER = {
@@ -70,6 +70,31 @@ STAGE_NUMBER = {
     MediaProcessingStatus.READY: 11,
     MediaProcessingStatus.FAILED: 0,
 }
+
+YOUTUBE_COOKIE_REQUIRED_MESSAGE = (
+    "YouTube requires authenticated cookies on this server. Update the server cookie file "
+    "or upload the media file directly."
+)
+YOUTUBE_AUTH_PATTERNS = (
+    "sign in to confirm you’re not a bot",
+    "sign in to confirm you're not a bot",
+    "cookies-from-browser",
+    "cookies for authentication",
+    "login required",
+)
+
+
+class _SilentYtdlpLogger:
+    """Prevent yt-dlp diagnostics from printing URLs, headers, or cookie details."""
+
+    def debug(self, _message: str) -> None:
+        return
+
+    def warning(self, _message: str) -> None:
+        return
+
+    def error(self, _message: str) -> None:
+        return
 
 
 class MediaIngestionService:
@@ -210,7 +235,13 @@ class MediaProcessingService:
         self.vector_store = RelationalVectorStore(session)
         self.intelligence = TranscriptIntelligenceService()
 
-    def process(self, media_source_id: str, *, forced_language: str | None = None) -> MediaSource:
+    def process(
+        self,
+        media_source_id: str,
+        *,
+        forced_language: str | None = None,
+        output_language: str = "auto",
+    ) -> MediaSource:
         source = self.media.get(media_source_id)
         if source is None:
             raise NotFoundError("Media source")
@@ -234,7 +265,9 @@ class MediaProcessingService:
         active_job: TranscriptJob | None = None
         try:
             self._status(source, MediaProcessingStatus.VALIDATING, "Validating media source.")
-            media_path, imported_subtitles = self._resolve_source(source, temporary_directory)
+            media_path, imported_subtitles = self._resolve_source(
+                source, temporary_directory, forced_language
+            )
             metadata = self._probe_media(media_path)
             self._apply_metadata(source, metadata)
             if (
@@ -253,7 +286,9 @@ class MediaProcessingService:
                     media_path, temporary_directory
                 )
             if imported_subtitles is not None:
-                segments = subtitle_segments(imported_subtitles, forced_language)
+                segments = subtitle_segments(
+                    imported_subtitles, transcription_language(forced_language)
+                )
                 source.subtitle_source = source.subtitle_source or "embedded_or_official_subtitles"
                 source.transcription_status = "subtitles_imported"
 
@@ -275,7 +310,9 @@ class MediaProcessingService:
                     model_name=self.transcription_provider.model_name,
                     device=self.settings.transcription_device,
                     compute_type=self.settings.transcription_compute_type,
-                    forced_language=forced_language or self.settings.transcription_language,
+                    forced_language=transcription_language(
+                        forced_language or self.settings.transcription_language
+                    ),
                     attempt_number=source.processing_attempts,
                     started_at=datetime.now(UTC),
                 )
@@ -283,7 +320,9 @@ class MediaProcessingService:
                 self.session.commit()
                 result = self.transcription_provider.transcribe(
                     audio_path,
-                    language=forced_language or self.settings.transcription_language,
+                    language=transcription_language(
+                        forced_language or self.settings.transcription_language
+                    ),
                 )
                 segments = result.segments
                 source.detected_language = result.language
@@ -311,7 +350,11 @@ class MediaProcessingService:
                 MediaProcessingStatus.SUMMARISING,
                 "Generating transcript intelligence and chapters.",
             )
-            self._generate_intelligence(source, segments)
+            resolved_output_language = resolve_output_language(
+                output_language,
+                " ".join(segment.text for segment in segments),
+            )
+            self._generate_intelligence(source, segments, resolved_output_language)
             source.ingestion_date = datetime.now(UTC)
             self._status(
                 source,
@@ -346,7 +389,10 @@ class MediaProcessingService:
             shutil.rmtree(temporary_directory, ignore_errors=True)
 
     def _resolve_source(
-        self, source: MediaSource, temporary_directory: Path
+        self,
+        source: MediaSource,
+        temporary_directory: Path,
+        forced_language: str | None,
     ) -> tuple[Path, Path | None]:
         if source.source_kind is MediaSourceKind.UPLOAD:
             if not source.storage_key:
@@ -368,7 +414,7 @@ class MediaProcessingService:
             "Fetching public metadata without bypassing access controls.",
         )
         if source.source_kind is MediaSourceKind.YOUTUBE:
-            return self._download_youtube(source, temporary_directory)
+            return self._download_youtube(source, temporary_directory, forced_language)
         return self._download_public(source, temporary_directory), None
 
     def _download_public(self, source: MediaSource, temporary_directory: Path) -> Path:
@@ -426,7 +472,10 @@ class MediaProcessingService:
         return destination
 
     def _download_youtube(
-        self, source: MediaSource, temporary_directory: Path
+        self,
+        source: MediaSource,
+        temporary_directory: Path,
+        forced_language: str | None,
     ) -> tuple[Path, Path | None]:
         assert source.original_url is not None
         self._status(
@@ -434,16 +483,12 @@ class MediaProcessingService:
             MediaProcessingStatus.DOWNLOADING_OR_EXTRACTING_SUBTITLES,
             "Looking for official or automatically generated subtitles.",
         )
-        metadata_command = [
-            sys.executable,
-            "-m",
-            "yt_dlp",
-            "--dump-single-json",
-            "--no-playlist",
-            "--skip-download",
+        metadata = self._run_ytdlp(
             source.original_url,
-        ]
-        metadata = self._run_json_command(metadata_command, "youtube_metadata_unavailable")
+            {"skip_download": True},
+            download=False,
+            error_code="youtube_metadata_unavailable",
+        )
         source.title = str(metadata.get("title") or source.title)[:500]
         source.author = str(metadata.get("channel") or metadata.get("uploader") or "")[:300] or None
         source.duration_seconds = _float_or_none(metadata.get("duration"))
@@ -454,44 +499,50 @@ class MediaProcessingService:
             "webpage_url": metadata.get("webpage_url"),
         }
         output_template = temporary_directory / "source.%(ext)s"
-        subtitle_command = [
-            sys.executable,
-            "-m",
-            "yt_dlp",
-            "--no-playlist",
-            "--skip-download",
-            "--write-subs",
-            "--write-auto-subs",
-            "--sub-format",
-            "vtt",
-            "--sub-langs",
-            self.settings.transcription_language or "en.*",
-            "--output",
-            str(output_template),
-            source.original_url,
-        ]
-        self._run_command(subtitle_command, allow_failure=True)
-        subtitle_files = sorted(temporary_directory.glob("source*.vtt"))
+        requested_language = transcription_language(
+            forced_language or self.settings.transcription_language
+        )
+        subtitle_languages = [f"{requested_language}.*"] if requested_language else ["ar.*", "en.*"]
+        try:
+            self._run_ytdlp(
+                source.original_url,
+                {
+                    "skip_download": True,
+                    "writesubtitles": True,
+                    "writeautomaticsub": True,
+                    "subtitlesformat": "vtt",
+                    "subtitleslangs": subtitle_languages,
+                    "outtmpl": str(output_template),
+                },
+                download=False,
+                error_code="youtube_subtitles_unavailable",
+            )
+        except ProcessingError as exc:
+            if exc.code == "youtube_authentication_required":
+                raise
+        subtitle_files = sorted(
+            temporary_directory.glob("source*.vtt"),
+            key=lambda path: (
+                0 if requested_language and f".{requested_language}" in path.name else 1,
+                path.name,
+            ),
+        )
         if subtitle_files:
             source.subtitle_source = "official_or_auto_subtitles"
             placeholder = temporary_directory / "metadata-only"
             placeholder.touch()
             return placeholder, subtitle_files[0]
 
-        media_command = [
-            sys.executable,
-            "-m",
-            "yt_dlp",
-            "--no-playlist",
-            "--format",
-            "bestaudio/best",
-            "--max-filesize",
-            str(self.settings.max_media_upload_bytes),
-            "--output",
-            str(output_template),
+        self._run_ytdlp(
             source.original_url,
-        ]
-        self._run_command(media_command)
+            {
+                "format": "bestaudio/best",
+                "max_filesize": self.settings.max_media_upload_bytes,
+                "outtmpl": str(output_template),
+            },
+            download=True,
+            error_code="youtube_media_unavailable",
+        )
         downloaded = [
             path
             for path in temporary_directory.glob("source.*")
@@ -802,9 +853,12 @@ class MediaProcessingService:
         return result
 
     def _generate_intelligence(
-        self, source: MediaSource, segments: list[TranscribedSegment]
+        self,
+        source: MediaSource,
+        segments: list[TranscribedSegment],
+        output_language: str,
     ) -> None:
-        structured = self.intelligence.analyze(segments, source.detected_language)
+        structured = self.intelligence.analyze(segments, output_language)
         chapters = [
             MediaChapter(
                 id=hashlib.sha256(f"{source.id}:chapter:{value.index}".encode()).hexdigest(),
@@ -828,6 +882,69 @@ class MediaProcessingService:
             )
         )
         self.session.commit()
+
+    def _readable_cookie_file(self) -> Path | None:
+        configured = self.settings.ytdlp_cookies_file
+        if configured is None:
+            return None
+        try:
+            path = configured.expanduser()
+            if path.is_file() and os.access(path, os.R_OK):
+                return path
+        except OSError:
+            return None
+        return None
+
+    def _run_ytdlp(
+        self,
+        url: str,
+        options: dict[str, object],
+        *,
+        download: bool,
+        error_code: str,
+    ) -> dict[str, object]:
+        try:
+            from yt_dlp import YoutubeDL
+        except ImportError as exc:
+            raise ProcessingError(
+                "YouTube support is unavailable in this deployment. "
+                "Upload the media file directly.",
+                code="youtube_tool_unavailable",
+            ) from exc
+
+        safe_options: dict[str, object] = {
+            "quiet": True,
+            "no_warnings": True,
+            "noplaylist": True,
+            "noprogress": True,
+            "socket_timeout": self.settings.media_download_timeout_seconds,
+            "logger": _SilentYtdlpLogger(),
+            **options,
+        }
+        cookie_file = self._readable_cookie_file()
+        if cookie_file is not None:
+            safe_options["cookiefile"] = str(cookie_file)
+        try:
+            with YoutubeDL(safe_options) as downloader:
+                value = downloader.extract_info(url, download=download)
+        except Exception as exc:
+            detail = str(exc).lower()
+            if any(pattern in detail for pattern in YOUTUBE_AUTH_PATTERNS):
+                raise ProcessingError(
+                    YOUTUBE_COOKIE_REQUIRED_MESSAGE,
+                    code="youtube_authentication_required",
+                ) from None
+            raise ProcessingError(
+                "YouTube could not provide this media. Update the server cookies, retry later, "
+                "or upload the media file directly.",
+                code=error_code,
+            ) from None
+        if not isinstance(value, dict):
+            raise ProcessingError(
+                "YouTube returned invalid media metadata. Upload the media file directly.",
+                code=error_code,
+            )
+        return value
 
     def _status(self, source: MediaSource, status: MediaProcessingStatus, message: str) -> None:
         source.status = status

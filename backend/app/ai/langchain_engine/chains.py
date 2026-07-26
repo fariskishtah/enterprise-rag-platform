@@ -184,7 +184,7 @@ class CourseChainSuite:
         rewrite: QueryRewriteResult = state["rewrite"]
         documents: list[Document] = state["documents"]
         return {
-            "question": state["question"],
+            "question": f"{state['question']}\n\n{state['answer_language_instruction']}",
             "standalone_query": rewrite.standalone_query,
             "context": format_documents(documents),
         }
@@ -202,11 +202,13 @@ class CourseChainSuite:
         *,
         question: str,
         conversation_history: str = "",
+        answer_language_instruction: str = "Answer in English.",
     ) -> dict[str, Any]:
         return self.orchestration_chain.invoke(
             {
                 "question": question,
                 "conversation_history": conversation_history or "No previous conversation.",
+                "answer_language_instruction": answer_language_instruction,
             }
         )
 

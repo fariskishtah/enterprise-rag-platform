@@ -11,9 +11,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import TypeVar
 
 logger = logging.getLogger(__name__)
+ResultT = TypeVar("ResultT")
 
 
 @dataclass
@@ -43,6 +46,7 @@ class GenerationQueue:
         self._completed = 0
         self._timed_out = 0
         self._last_finished: float | None = None
+        self._draining_tasks: set[asyncio.Task[None]] = set()
 
     @property
     def stats(self) -> GenerationQueueStats:
@@ -87,3 +91,45 @@ class GenerationQueue:
             logger.warning("Generation queue wait timed out after %.1fs", effective_timeout)
             raise
         return self._Slot(self)
+
+    async def execute(
+        self,
+        slot: _Slot,
+        operation: Callable[[], ResultT],
+        *,
+        timeout: float,
+    ) -> ResultT:
+        """Run blocking model work without releasing its slot before it truly exits.
+
+        ``asyncio.to_thread`` cannot cancel an already-running worker thread. On an HTTP
+        timeout or client cancellation, keep the semaphore occupied in the background so a
+        second heavyweight request cannot overlap the still-draining model call.
+        """
+
+        await slot.__aenter__()
+        task = asyncio.create_task(asyncio.to_thread(operation))
+        try:
+            result = await asyncio.wait_for(asyncio.shield(task), timeout=timeout)
+        except BaseException:
+            if task.done():
+                await slot.__aexit__(None, None, None)
+            else:
+                self._timed_out += 1
+                release_task = asyncio.create_task(self._release_when_done(slot, task))
+                self._draining_tasks.add(release_task)
+                release_task.add_done_callback(self._draining_tasks.discard)
+            raise
+        await slot.__aexit__(None, None, None)
+        return result
+
+    async def _release_when_done(
+        self,
+        slot: _Slot,
+        task: asyncio.Task[ResultT],
+    ) -> None:
+        try:
+            await task
+        except BaseException:
+            logger.info("A timed-out generation task finished with an error.")
+        finally:
+            await slot.__aexit__(None, None, None)

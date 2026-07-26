@@ -22,6 +22,7 @@ import type {
   TranscriptSegment,
   VideoIntelligence,
 } from "../types";
+import type { OutputLanguage } from "../utils/language";
 
 // A production bundle is served by FastAPI, so API traffic must stay on the
 // same origin. The override is intentionally development-only for Vite and the
@@ -34,7 +35,7 @@ const API_BASE_URL = import.meta.env.PROD
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 /** Extended timeout for intelligence operations (ms). */
-const INTELLIGENCE_TIMEOUT_MS = 150_000;
+const INTELLIGENCE_TIMEOUT_MS = 210_000;
 
 interface ErrorEnvelope {
   error?: {
@@ -218,6 +219,7 @@ export function askKnowledgeBase(input: {
   sessionId?: string;
   debug?: boolean;
   responseMode?: "concise" | "detailed";
+  outputLanguage?: OutputLanguage;
 }): Promise<RagAnswer> {
   return request<RagAnswer>(
     `/knowledge-bases/${input.knowledgeBaseId}/ask`,
@@ -229,6 +231,7 @@ export function askKnowledgeBase(input: {
         session_id: input.sessionId,
         debug: input.debug ?? false,
         response_mode: input.responseMode ?? "concise",
+        output_language: input.outputLanguage ?? "auto",
       }),
     },
     INTELLIGENCE_TIMEOUT_MS,
@@ -258,6 +261,7 @@ export function createSummary(input: {
   documentIds: string[];
   kind: SummaryKind;
   sectionIndex?: number;
+  outputLanguage?: OutputLanguage;
 }): Promise<SummaryResult> {
   return request<SummaryResult>(
     "/intelligence/summaries",
@@ -269,6 +273,7 @@ export function createSummary(input: {
         document_ids: input.documentIds,
         kind: input.kind,
         section_index: input.sectionIndex,
+        output_language: input.outputLanguage ?? "auto",
       }),
     },
     INTELLIGENCE_TIMEOUT_MS,
@@ -278,6 +283,7 @@ export function createSummary(input: {
 export function compareDocuments(input: {
   knowledgeBaseId: string;
   documentIds: string[];
+  outputLanguage?: OutputLanguage;
 }): Promise<ComparisonResult> {
   return request<ComparisonResult>(
     "/intelligence/comparisons",
@@ -287,6 +293,7 @@ export function compareDocuments(input: {
       body: JSON.stringify({
         knowledge_base_id: input.knowledgeBaseId,
         document_ids: input.documentIds,
+        output_language: input.outputLanguage ?? "auto",
       }),
     },
     INTELLIGENCE_TIMEOUT_MS,
@@ -298,6 +305,7 @@ export function createReport(input: {
   documentIds: string[];
   title: string;
   objective: string;
+  outputLanguage?: OutputLanguage;
 }): Promise<ReportResult> {
   return request<ReportResult>(
     "/intelligence/reports",
@@ -309,6 +317,7 @@ export function createReport(input: {
         document_ids: input.documentIds,
         title: input.title,
         objective: input.objective,
+        output_language: input.outputLanguage ?? "auto",
       }),
     },
     INTELLIGENCE_TIMEOUT_MS,
@@ -321,6 +330,10 @@ export function originalDocumentUrl(documentId: string): string {
 
 export function getRagConfiguration(): Promise<RagConfiguration> {
   return request<RagConfiguration>("/rag/config");
+}
+
+export function warmModels(): Promise<{ status: "cold" | "loading" | "ready" | "failed" }> {
+  return request("/rag/warmup", { method: "POST" });
 }
 
 export function citationLocation(citation: Citation): string {
@@ -341,10 +354,14 @@ export function listMedia(knowledgeBaseId: string): Promise<MediaList> {
 export function uploadMedia(
   knowledgeBaseId: string,
   file: File,
+  forcedLanguage: OutputLanguage = "auto",
+  outputLanguage: OutputLanguage = "auto",
 ): Promise<MediaSource> {
   const body = new FormData();
   body.append("file", file);
   body.append("auto_process", "true");
+  body.append("forced_language", forcedLanguage);
+  body.append("output_language", outputLanguage);
   return request<MediaSource>(`/knowledge-bases/${knowledgeBaseId}/media`, {
     method: "POST",
     body,
@@ -354,11 +371,18 @@ export function uploadMedia(
 export function linkMedia(
   knowledgeBaseId: string,
   url: string,
+  forcedLanguage: OutputLanguage = "auto",
+  outputLanguage: OutputLanguage = "auto",
 ): Promise<MediaSource> {
   return request<MediaSource>(`/knowledge-bases/${knowledgeBaseId}/media/from-url`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url, auto_process: true }),
+    body: JSON.stringify({
+      url,
+      auto_process: true,
+      forced_language: forcedLanguage,
+      output_language: outputLanguage,
+    }),
   });
 }
 
@@ -392,14 +416,23 @@ export function getVideoIntelligence(mediaId: string): Promise<VideoIntelligence
   return request<VideoIntelligence>(`/media/${mediaId}/intelligence`);
 }
 
-export function retryMedia(mediaId: string): Promise<MediaSource> {
-  return request<MediaSource>(`/media/${mediaId}/retry`, { method: "POST" });
+export function retryMedia(
+  mediaId: string,
+  forcedLanguage: OutputLanguage = "auto",
+  outputLanguage: OutputLanguage = "auto",
+): Promise<MediaSource> {
+  const query = new URLSearchParams({
+    forced_language: forcedLanguage,
+    output_language: outputLanguage,
+  });
+  return request<MediaSource>(`/media/${mediaId}/retry?${query}`, { method: "POST" });
 }
 
 export function askMedia(
   mediaId: string,
   question: string,
   sessionId?: string,
+  outputLanguage: OutputLanguage = "auto",
 ): Promise<RagAnswer> {
   return request<RagAnswer>(
     `/media/${mediaId}/ask`,
@@ -411,6 +444,7 @@ export function askMedia(
         session_id: sessionId,
         debug: true,
         response_mode: "concise",
+        output_language: outputLanguage,
       }),
     },
     INTELLIGENCE_TIMEOUT_MS,

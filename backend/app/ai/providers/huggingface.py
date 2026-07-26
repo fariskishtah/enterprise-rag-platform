@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+from collections import OrderedDict
 from pathlib import Path
 from threading import Lock
 from typing import Any, ClassVar
@@ -13,7 +15,12 @@ from app.core.errors import ModelProviderError
 
 class HuggingFaceEmbeddingProvider(EmbeddingProvider):
     _models: ClassVar[dict[tuple[str, str, str, bool], Any]] = {}
+    _states: ClassVar[dict[tuple[str, str, str, bool], str]] = {}
+    _query_cache: ClassVar[
+        OrderedDict[tuple[tuple[str, str, str, bool], str], np.ndarray]
+    ] = OrderedDict()
     _lock: ClassVar[Lock] = Lock()
+    _query_cache_lock: ClassVar[Lock] = Lock()
 
     def __init__(
         self,
@@ -23,12 +30,14 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider):
         device: str = "cpu",
         batch_size: int = 32,
         local_files_only: bool = False,
+        query_cache_size: int = 128,
     ) -> None:
         self._model_name = model_name
         self.cache_path = cache_path
         self.device = device
         self.batch_size = batch_size
         self.local_files_only = local_files_only
+        self.query_cache_size = query_cache_size
 
     @property
     def model_name(self) -> str:
@@ -45,19 +54,32 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider):
             for key in self._models
         )
 
-    def _load_model(self) -> Any:
-        key = (
+    @property
+    def load_status(self) -> str:
+        key = self._cache_key()
+        return "ready" if key in self._models else self._states.get(key, "cold")
+
+    def _cache_key(self) -> tuple[str, str, str, bool]:
+        return (
             self._model_name,
             str(self.cache_path.resolve()),
             self.device,
             self.local_files_only,
         )
+
+    @property
+    def _uses_e5_prefixes(self) -> bool:
+        return self._model_name.lower().startswith("intfloat/multilingual-e5-")
+
+    def _load_model(self) -> Any:
+        key = self._cache_key()
         if key in self._models:
             return self._models[key]
         with self._lock:
             if key in self._models:
                 return self._models[key]
             try:
+                self._states[key] = "loading"
                 from sentence_transformers import SentenceTransformer
 
                 self.cache_path.mkdir(parents=True, exist_ok=True)
@@ -68,19 +90,22 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider):
                     local_files_only=self.local_files_only,
                 )
             except Exception as exc:
+                self._states[key] = "failed"
                 raise ModelProviderError(
                     "The embedding model could not be loaded. Check the local model "
                     "configuration and available system memory."
                 ) from exc
             self._models[key] = model
+            self._states[key] = "ready"
             return model
 
     def embed_documents(self, texts: list[str]) -> np.ndarray:
         if not texts:
             return np.empty((0, 0), dtype=np.float32)
         try:
+            prepared = [f"passage: {text}" for text in texts] if self._uses_e5_prefixes else texts
             values = self._load_model().encode(
-                texts,
+                prepared,
                 batch_size=self.batch_size,
                 convert_to_numpy=True,
                 normalize_embeddings=True,
@@ -93,14 +118,44 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider):
         return np.asarray(values, dtype=np.float32)
 
     def embed_query(self, text: str) -> np.ndarray:
-        values = self.embed_documents([text])
-        if values.shape[0] != 1:
+        key = self._cache_key()
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        cache_key = (key, digest)
+        if self.query_cache_size:
+            with self._query_cache_lock:
+                cached = self._query_cache.get(cache_key)
+                if cached is not None:
+                    self._query_cache.move_to_end(cache_key)
+                    return cached.copy()
+        prepared = f"query: {text}" if self._uses_e5_prefixes else text
+        try:
+            values = self._load_model().encode(
+                [prepared],
+                batch_size=1,
+                convert_to_numpy=True,
+                normalize_embeddings=True,
+                show_progress_bar=False,
+            )
+        except ModelProviderError:
+            raise
+        except Exception as exc:
+            raise ModelProviderError("The query embedding could not be generated.") from exc
+        result = np.asarray(values, dtype=np.float32)
+        if result.shape[0] != 1:
             raise ModelProviderError("The query embedding could not be generated.")
-        return values[0]
+        embedding = result[0]
+        if self.query_cache_size:
+            with self._query_cache_lock:
+                self._query_cache[cache_key] = embedding.copy()
+                self._query_cache.move_to_end(cache_key)
+                while len(self._query_cache) > self.query_cache_size:
+                    self._query_cache.popitem(last=False)
+        return embedding
 
 
 class HuggingFaceGenerationProvider(GenerationProvider):
     _models: ClassVar[dict[tuple[str, str, str, bool, str], tuple[Any, Any, Any, bool]]] = {}
+    _states: ClassVar[dict[tuple[str, str, str, bool, str], str]] = {}
     _lock: ClassVar[Lock] = Lock()
 
     def __init__(
@@ -112,6 +167,7 @@ class HuggingFaceGenerationProvider(GenerationProvider):
         local_files_only: bool = False,
         fallback_model_name: str | None = None,
         quantization: QuantizationMode = "none",
+        maximum_generation_seconds: float = 120.0,
     ) -> None:
         self._model_name = model_name
         self._active_model_name = model_name
@@ -120,6 +176,7 @@ class HuggingFaceGenerationProvider(GenerationProvider):
         self.device = device
         self.local_files_only = local_files_only
         self.quantization = quantization
+        self.maximum_generation_seconds = maximum_generation_seconds
 
     @property
     def model_name(self) -> str:
@@ -138,20 +195,39 @@ class HuggingFaceGenerationProvider(GenerationProvider):
             for key in self._models
         )
 
-    def _load_named_model(self, model_name: str) -> tuple[Any, Any, Any, bool]:
-        key = (
+    @property
+    def load_status(self) -> str:
+        keys = [
+            self._model_key(value)
+            for value in (self._model_name, self.fallback_model_name)
+            if value
+        ]
+        if any(key in self._models for key in keys):
+            return "ready"
+        if any(self._states.get(key) == "loading" for key in keys):
+            return "loading"
+        if keys and all(self._states.get(key) == "failed" for key in keys):
+            return "failed"
+        return "cold"
+
+    def _model_key(self, model_name: str) -> tuple[str, str, str, bool, str]:
+        return (
             model_name,
             str(self.cache_path.resolve()),
             self.device,
             self.local_files_only,
             self.quantization,
         )
+
+    def _load_named_model(self, model_name: str) -> tuple[Any, Any, Any, bool]:
+        key = self._model_key(model_name)
         if key in self._models:
             return self._models[key]
         with self._lock:
             if key in self._models:
                 return self._models[key]
             try:
+                self._states[key] = "loading"
                 import torch
                 from transformers import (
                     AutoConfig,
@@ -190,12 +266,14 @@ class HuggingFaceGenerationProvider(GenerationProvider):
                     model.to(self.device)
                 model.eval()
             except Exception as exc:
+                self._states[key] = "failed"
                 raise ModelProviderError(
                     "The generation model could not be loaded. Check the local model "
                     "configuration and available system memory."
                 ) from exc
             loaded = (tokenizer, model, torch, bool(config.is_encoder_decoder))
             self._models[key] = loaded
+            self._states[key] = "ready"
             return loaded
 
     def _load_model(self) -> tuple[Any, Any, Any, bool]:
@@ -259,6 +337,7 @@ class HuggingFaceGenerationProvider(GenerationProvider):
                 "max_new_tokens": max_new_tokens,
                 "do_sample": sampling_enabled,
                 "repetition_penalty": repetition_penalty,
+                "max_time": self.maximum_generation_seconds,
             }
             if sampling_enabled:
                 generation_options["temperature"] = temperature

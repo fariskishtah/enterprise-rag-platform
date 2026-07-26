@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -65,6 +65,7 @@ class RagAskRequest(BaseModel):
     top_k: int | None = Field(default=None, ge=1, le=20)
     similarity_threshold: float | None = Field(default=None, ge=-1.0, le=1.0)
     response_mode: str = Field(default="concise", pattern="^(concise|detailed)$")
+    output_language: Literal["auto", "ar", "en"] = "auto"
     source_document_ids: list[str] = Field(default_factory=list, max_length=50)
     debug: bool = False
 
@@ -113,6 +114,7 @@ class RagAnswerRead(BaseModel):
     response_time: float
     response_time_ms: float
     not_found: bool
+    output_language: Literal["ar", "en"]
     created_at: datetime
     debug: RagDebugRead | None = None
 
@@ -126,6 +128,9 @@ class RagConfigurationRead(BaseModel):
     embedding_model_cached: bool
     generation_model_cached: bool
     model_warm: bool
+    embedding_model_status: Literal["cold", "loading", "ready", "failed"] = "cold"
+    generation_model_status: Literal["cold", "loading", "ready", "failed"] = "cold"
+    warmup_status: Literal["cold", "loading", "ready", "failed"] = "cold"
     vector_store: str
     top_k: int
     candidate_pool: int
@@ -146,3 +151,4 @@ class RagConfigurationRead(BaseModel):
     generation_queue_active: int = 0
     generation_queue_queued: int = 0
     generation_timeout_seconds: int = 90
+    embedding_reindex_required: bool = False

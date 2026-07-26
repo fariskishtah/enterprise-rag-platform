@@ -1,5 +1,7 @@
+import asyncio
+import os
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -15,6 +17,7 @@ from app.ai.providers.huggingface import (
     HuggingFaceEmbeddingProvider,
     HuggingFaceGenerationProvider,
 )
+from app.ai.warmup import ModelWarmupController
 from app.api.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.errors import (
@@ -45,12 +48,26 @@ def create_app(
     runtime_settings = settings or get_settings()
     engine = create_database_engine(runtime_settings.database_url)
     session_factory = create_session_factory(engine)
+    warmup_controller = ModelWarmupController()
+    warmup_task: asyncio.Task[None] | None = None
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        nonlocal warmup_task
         runtime_settings.storage_path.mkdir(parents=True, exist_ok=True)
         Base.metadata.create_all(engine)
+        if runtime_settings.warm_models_on_startup and warmup_controller.begin():
+            warmup_task = asyncio.create_task(
+                asyncio.to_thread(
+                    warmup_controller.run,
+                    app.state.embedding_provider,
+                    app.state.generation_provider,
+                    runtime_settings,
+                )
+            )
         yield
+        if warmup_task is not None and not warmup_task.done():
+            warmup_task.cancel()
         engine.dispose()
 
     app = FastAPI(
@@ -75,12 +92,26 @@ def create_app(
         )
     )
     app.state.model_device = configured_model_device
+    if configured_model_device == "cpu" and (
+        embedding_provider is None or generation_provider is None
+    ):
+        os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
+        os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+        try:
+            import torch
+
+            torch.set_num_threads(runtime_settings.torch_num_threads)
+            with suppress(RuntimeError):
+                torch.set_num_interop_threads(runtime_settings.torch_num_interop_threads)
+        except ImportError:
+            pass
     app.state.embedding_provider = embedding_provider or HuggingFaceEmbeddingProvider(
         model_name=runtime_settings.embedding_model_name,
         cache_path=runtime_settings.model_cache_path,
         device=configured_model_device,
         batch_size=runtime_settings.embedding_batch_size,
         local_files_only=runtime_settings.hf_local_files_only,
+        query_cache_size=runtime_settings.query_embedding_cache_size,
     )
     app.state.generation_provider = generation_provider or HuggingFaceGenerationProvider(
         model_name=runtime_settings.generation_model_name,
@@ -89,6 +120,7 @@ def create_app(
         local_files_only=runtime_settings.hf_local_files_only,
         fallback_model_name=runtime_settings.generation_fallback_model_name,
         quantization=runtime_settings.generation_quantization,
+        maximum_generation_seconds=runtime_settings.generation_timeout_seconds,
     )
 
     # LangChain runtime: in low-memory mode with force_wrapper, the
@@ -109,7 +141,10 @@ def create_app(
         device=runtime_settings.transcription_device,
         compute_type=runtime_settings.transcription_compute_type,
         cpu_threads=runtime_settings.transcription_cpu_threads,
+        num_workers=runtime_settings.transcription_num_workers,
+        beam_size=runtime_settings.transcription_beam_size,
     )
+    app.state.model_warmup = warmup_controller
 
     # ── Generation concurrency queue ─────────────────────────────────
     app.state.generation_queue = GenerationQueue(

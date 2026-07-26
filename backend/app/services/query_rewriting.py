@@ -5,7 +5,8 @@ import re
 from app.models.conversation import ChatMessage, ChatRole
 
 FOLLOW_UP_PATTERN = re.compile(
-    r"\b(it|its|they|their|them|that|those|this|these|former|latter)\b",
+    r"\b(it|its|they|their|them|that|those|this|these|former|latter|"
+    r"هو|هي|هم|هذا|هذه|ذلك|تلك|هؤلاء|السابق|اللاحق)\b",
     re.IGNORECASE,
 )
 

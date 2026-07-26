@@ -1,14 +1,22 @@
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.core.errors import ProcessingError
+from app.db.session import session_scope
 from app.media.transcription import (
+    FasterWhisperTranscriptionProvider,
     TranscribedSegment,
     TranscriptionProvider,
     TranscriptionResult,
 )
-from app.services.media import MediaProcessingService
+from app.services.media import (
+    YOUTUBE_COOKIE_REQUIRED_MESSAGE,
+    MediaProcessingService,
+)
 from tests.helpers import create_knowledge_base, make_test_wav
 
 
@@ -52,6 +60,40 @@ class NoSpeechTranscriptionProvider(TranscriptionProvider):
     def transcribe(self, media_path: Path, *, language: str | None = None) -> TranscriptionResult:
         del media_path, language
         raise ProcessingError("No speech was detected in this media.", code="no_speech_detected")
+
+
+class ArabicTranscriptionProvider(TranscriptionProvider):
+    def __init__(self) -> None:
+        self.languages: list[str | None] = []
+
+    @property
+    def model_name(self) -> str:
+        return "deterministic-arabic-transcriber"
+
+    def transcribe(self, media_path: Path, *, language: str | None = None) -> TranscriptionResult:
+        assert media_path.suffix == ".wav"
+        self.languages.append(language)
+        texts = [
+            "مرحباً بكم في مراجعة المشروع.",
+            "قرر الفريق إطلاق المنتج في 15 مايو 2026.",
+            "يجب على مريم إكمال قائمة التحقق قبل يوم الخميس.",
+        ]
+        return TranscriptionResult(
+            segments=[
+                TranscribedSegment(
+                    index=index,
+                    start=float(index * 4),
+                    end=float(index * 4 + 3),
+                    text=text,
+                    language="ar",
+                    confidence=0.98,
+                )
+                for index, text in enumerate(texts)
+            ],
+            language="ar",
+            language_probability=0.99,
+            model_name=self.model_name,
+        )
 
 
 def upload_media(
@@ -214,3 +256,224 @@ def test_inaccessible_public_url_has_actionable_retryable_failure(
     assert failed["status"] == "failed"
     assert failed["error_code"] == "public_media_unavailable"
     assert failed["retryable"] is True
+
+
+def test_arabic_transcription_preserves_language_punctuation_timestamps_and_order(
+    client: TestClient,
+) -> None:
+    provider = ArabicTranscriptionProvider()
+    client.app.state.transcription_provider = provider
+    knowledge_base_id = create_knowledge_base(client)
+    response = client.post(
+        f"/api/v1/knowledge-bases/{knowledge_base_id}/media",
+        data={
+            "auto_process": "true",
+            "forced_language": "ar",
+            "output_language": "ar",
+        },
+        files={"file": ("arabic.wav", make_test_wav(), "audio/wav")},
+    )
+
+    assert response.status_code == 201, response.text
+    detail = client.get(f"/api/v1/media/{response.json()['id']}").json()
+    transcript = client.get(f"/api/v1/media/{response.json()['id']}/transcript").json()
+    intelligence = client.get(
+        f"/api/v1/media/{response.json()['id']}/intelligence"
+    ).json()
+    assert detail["status"] == "ready"
+    assert detail["transcript_jobs"][0]["forced_language"] == "ar"
+    assert provider.languages == ["ar"]
+    assert transcript["language"] == "ar"
+    assert [segment["start_time"] for segment in transcript["segments"]] == [0.0, 4.0, 8.0]
+    assert transcript["segments"][1]["text"].endswith(".")
+    assert "15 مايو 2026" in transcript["full_text"]
+    assert intelligence["output_language"] == "ar"
+    assert intelligence["quiz_questions"][0].endswith("؟")
+    assert intelligence["chapters"][0]["title"].startswith("مرحباً")
+
+
+def test_faster_whisper_uses_cpu_bounded_beam_vad_and_transcription_task(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeWhisperModel:
+        def transcribe(self, _path: str, **options: object):
+            captured.update(options)
+            segment = SimpleNamespace(
+                start=0.0,
+                end=2.0,
+                text="نص عربي، مع علامات الترقيم.",
+                avg_logprob=-0.1,
+            )
+            info = SimpleNamespace(language="ar", language_probability=0.99)
+            return iter([segment]), info
+
+    provider = FasterWhisperTranscriptionProvider(
+        model_name="base",
+        cache_path=tmp_path / "whisper",
+        device="cpu",
+        compute_type="int8",
+        cpu_threads=2,
+        num_workers=1,
+        beam_size=3,
+    )
+    monkeypatch.setattr(provider, "_load_model", lambda: FakeWhisperModel())
+    result = provider.transcribe(tmp_path / "arabic.wav", language="ar")
+
+    assert captured == {
+        "language": "ar",
+        "task": "transcribe",
+        "beam_size": 3,
+        "vad_filter": True,
+        "word_timestamps": False,
+        "condition_on_previous_text": True,
+    }
+    assert result.segments[0].text == "نص عربي، مع علامات الترقيم."
+
+
+def test_ytdlp_cookie_file_is_optional_readable_and_never_returned_by_api(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    cookie_file = tmp_path / "youtube-cookies.txt"
+    cookie_file.write_text("secret-cookie-line", encoding="utf-8")
+    captured_options: list[dict[str, object]] = []
+
+    class FakeYoutubeDL:
+        def __init__(self, options: dict[str, object]) -> None:
+            captured_options.append(options)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def extract_info(self, _url: str, *, download: bool):
+            return {"id": "video", "title": "Safe video", "download": download}
+
+    monkeypatch.setitem(sys.modules, "yt_dlp", SimpleNamespace(YoutubeDL=FakeYoutubeDL))
+    configured = client.app.state.settings.model_copy(
+        update={"ytdlp_cookies_file": cookie_file}
+    )
+    with session_scope(client.app.state.session_factory) as session:
+        service = MediaProcessingService(
+            session=session,
+            storage=client.app.state.file_storage,
+            settings=configured,
+            embedding_provider=client.app.state.embedding_provider,
+            transcription_provider=client.app.state.transcription_provider,
+        )
+        service._run_ytdlp(
+            "https://www.youtube.com/watch?v=safe",
+            {"skip_download": True},
+            download=False,
+            error_code="youtube_metadata_unavailable",
+        )
+
+    assert captured_options[0]["cookiefile"] == str(cookie_file)
+    assert "secret-cookie-line" not in caplog.text
+    configuration_text = client.get("/api/v1/rag/config").text
+    assert str(cookie_file) not in configuration_text
+    assert "secret-cookie-line" not in configuration_text
+
+
+@pytest.mark.parametrize("configured_path", [None, "missing", "unreadable"])
+def test_ytdlp_omits_cookiefile_when_not_configured_or_not_readable(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    configured_path: str | None,
+) -> None:
+    captured_options: list[dict[str, object]] = []
+
+    class FakeYoutubeDL:
+        def __init__(self, options: dict[str, object]) -> None:
+            captured_options.append(options)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def extract_info(self, _url: str, *, download: bool):
+            return {"id": "video", "download": download}
+
+    cookie_path: Path | None = None
+    if configured_path == "missing":
+        cookie_path = tmp_path / "missing-cookies.txt"
+    elif configured_path == "unreadable":
+        cookie_path = tmp_path / "unreadable-cookies.txt"
+        cookie_path.write_text("secret", encoding="utf-8")
+        original_access = __import__("os").access
+        monkeypatch.setattr(
+            "app.services.media.os.access",
+            lambda path, mode: False if Path(path) == cookie_path else original_access(path, mode),
+        )
+    monkeypatch.setitem(sys.modules, "yt_dlp", SimpleNamespace(YoutubeDL=FakeYoutubeDL))
+    settings = client.app.state.settings.model_copy(update={"ytdlp_cookies_file": cookie_path})
+    with session_scope(client.app.state.session_factory) as session:
+        service = MediaProcessingService(
+            session=session,
+            storage=client.app.state.file_storage,
+            settings=settings,
+            embedding_provider=client.app.state.embedding_provider,
+            transcription_provider=client.app.state.transcription_provider,
+        )
+        service._run_ytdlp(
+            "https://www.youtube.com/watch?v=safe",
+            {},
+            download=False,
+            error_code="youtube_metadata_unavailable",
+        )
+
+    assert "cookiefile" not in captured_options[0]
+
+
+def test_youtube_antibot_error_becomes_safe_terminal_failure_without_secrets(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    secret = "private-cookie-value"
+
+    class FailingYoutubeDL:
+        def __init__(self, _options: dict[str, object]) -> None:
+            return
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def extract_info(self, _url: str, *, download: bool):
+            del download
+            raise RuntimeError(
+                f"Sign in to confirm you're not a bot. Use --cookies for authentication {secret}"
+            )
+
+    monkeypatch.setitem(sys.modules, "yt_dlp", SimpleNamespace(YoutubeDL=FailingYoutubeDL))
+    monkeypatch.setattr("app.services.media.validate_public_url", lambda value: value)
+    knowledge_base_id = create_knowledge_base(client)
+    linked = client.post(
+        f"/api/v1/knowledge-bases/{knowledge_base_id}/media/from-url",
+        json={
+            "url": "https://www.youtube.com/watch?v=blocked",
+            "auto_process": False,
+        },
+    )
+    assert linked.status_code == 201, linked.text
+    client.post(f"/api/v1/media/{linked.json()['id']}/process")
+    failed = client.get(f"/api/v1/media/{linked.json()['id']}").json()
+
+    assert failed["status"] == "failed"
+    assert failed["error_code"] == "youtube_authentication_required"
+    assert failed["safe_error_message"] == YOUTUBE_COOKIE_REQUIRED_MESSAGE
+    assert secret not in str(failed)
+    assert secret not in caplog.text

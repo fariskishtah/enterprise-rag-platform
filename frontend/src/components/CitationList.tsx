@@ -1,5 +1,6 @@
 import { citationLocation } from "../api/client";
 import type { Citation } from "../types";
+import { contentDirection } from "../utils/language";
 
 interface CitationListProps {
   citations: Citation[];
@@ -27,7 +28,7 @@ export function CitationList({ citations, expandable = true }: CitationListProps
               </small>
             </span>
           </summary>
-          <p>{citation.passage}</p>
+          <p dir={contentDirection(citation.passage)}>{citation.passage}</p>
           <a
             href={
               citation.media_source_id && citation.timestamp_start != null

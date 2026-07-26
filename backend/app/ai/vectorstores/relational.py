@@ -48,6 +48,7 @@ class RelationalVectorStore(VectorStore):
         *,
         knowledge_base_id: str,
         query_embedding: np.ndarray,
+        model_name: str,
         top_k: int,
         similarity_threshold: float,
     ) -> list[VectorSearchResult]:
@@ -58,6 +59,7 @@ class RelationalVectorStore(VectorStore):
                 DocumentChunk.knowledge_base_id == knowledge_base_id,
                 DocumentChunk.embedding.is_not(None),
                 DocumentChunk.indexed_at.is_not(None),
+                DocumentChunk.embedding_model == model_name,
             )
         )
         rows = self.session.execute(statement).all()

@@ -42,6 +42,7 @@ class VectorStore(ABC):
         *,
         knowledge_base_id: str,
         query_embedding: np.ndarray,
+        model_name: str,
         top_k: int,
         similarity_threshold: float,
     ) -> list[VectorSearchResult]: ...

@@ -25,6 +25,7 @@ from app.schemas.intelligence import (
     SummaryRequest,
 )
 from app.schemas.rag import CitationRead
+from app.services.language import resolve_output_language
 from app.services.rag import source_to_citation
 from app.services.verification import VerificationService
 
@@ -135,10 +136,12 @@ class GroundedAnalysisService:
         context: AnalysisContext,
         *,
         max_new_tokens: int | None = None,
+        output_language: str = "en",
     ) -> str:
         prompt, _ = build_grounded_prompt(
             question=instruction,
             sources=context.sources,
+            output_language="ar" if output_language == "ar" else "en",
         )
         tokens = max_new_tokens or self.settings.intelligence_max_new_tokens
         return self.generation_provider.generate(
@@ -171,7 +174,11 @@ class SummaryService(GroundedAnalysisService):
             document_ids=request.document_ids,
             section_index=(request.section_index if request.kind is SummaryKind.SECTION else None),
         )
-        instructions = {
+        output_language = resolve_output_language(
+            request.output_language,
+            " ".join(source.text for source in context.sources),
+        )
+        english_instructions = {
             SummaryKind.WHOLE_DOCUMENT: (
                 "Summarize the selected document accurately. Cover its purpose, "
                 "main evidence, conclusions, and stated limitations."
@@ -192,13 +199,35 @@ class SummaryService(GroundedAnalysisService):
                 "findings, implications, risks, and limitations."
             ),
         }
-        content = self._generate(instructions[request.kind], context)
+        arabic_instructions = {
+            SummaryKind.WHOLE_DOCUMENT: (
+                "لخّص المستند المحدد بدقة، وغطِّ الغرض والأدلة الرئيسية والنتائج والقيود "
+                "المذكورة. استخدم عناوين عربية عند الحاجة."
+            ),
+            SummaryKind.KNOWLEDGE_BASE: (
+                "أنشئ توليفاً لقاعدة المعرفة المحددة، وحدد الموضوعات والنتائج المتسقة "
+                "والاختلافات والقيود بعناوين عربية."
+            ),
+            SummaryKind.SECTION: "لخّص هذا القسم مع الحفاظ على الحقائق والقيود المهمة.",
+            SummaryKind.KEY_POINTS: (
+                "أعد نقاطاً رئيسية موجزة في قائمة Markdown عربية، مع علامة مصدر لكل نقطة."
+            ),
+            SummaryKind.EXECUTIVE: (
+                "اكتب ملخصاً تنفيذياً عربياً لصانع قرار يشمل السياق والنتائج المهمة "
+                "والآثار والمخاطر والقيود."
+            ),
+        }
+        instructions = arabic_instructions if output_language == "ar" else english_instructions
+        content = self._generate(
+            instructions[request.kind], context, output_language=output_language
+        )
         return SummaryRead(
             kind=request.kind,
             content=content,
             citations=context.citations,
             verification=self.verifier.verify(content, context.sources),
             model_used=self.generation_provider.model_name,
+            output_language=output_language,
         )
 
 
@@ -221,23 +250,37 @@ class ComparisonService(GroundedAnalysisService):
             document_ids=request.document_ids,
             max_characters=self.settings.comparison_max_context_characters,
         )
+        output_language = resolve_output_language(
+            request.output_language,
+            " ".join(source.text for source in context.sources),
+        )
 
         consolidated_instruction = (
-            "Compare the selected documents across these dimensions. "
-            "For each dimension, write 1–3 concise sentences.\n\n"
-            "COMMON THEMES:\n(What themes appear in multiple documents?)\n\n"
-            "DIFFERENCES:\n(What material differences exist?)\n\n"
-            "CONTRADICTIONS:\n(Any conflicting claims? If none, say so.)\n\n"
-            "METHODOLOGIES:\n(How do the approaches or evidence sources differ?)\n\n"
-            "CONCLUSIONS:\n(How do the conclusions compare?)\n\n"
-            "LIMITATIONS:\n(What risks, gaps, or limitations are stated?)\n\n"
-            "Use [SOURCE:chunk_id] citations. Be factual and concise."
+            (
+                "قارن المستندات المحددة باستخدام الأدلة فقط. اكتب من جملة إلى ثلاث جمل "
+                "لكل قسم، واستخدم علامات [SOURCE:chunk_id].\n\n"
+                "الموضوعات المشتركة:\n\nالاختلافات:\n\nالتناقضات:\n\n"
+                "المنهجيات:\n\nالنتائج:\n\nالقيود:\n"
+            )
+            if output_language == "ar"
+            else (
+                "Compare the selected documents across these dimensions. "
+                "For each dimension, write 1–3 concise sentences.\n\n"
+                "COMMON THEMES:\n(What themes appear in multiple documents?)\n\n"
+                "DIFFERENCES:\n(What material differences exist?)\n\n"
+                "CONTRADICTIONS:\n(Any conflicting claims? If none, say so.)\n\n"
+                "METHODOLOGIES:\n(How do the approaches or evidence sources differ?)\n\n"
+                "CONCLUSIONS:\n(How do the conclusions compare?)\n\n"
+                "LIMITATIONS:\n(What risks, gaps, or limitations are stated?)\n\n"
+                "Use [SOURCE:chunk_id] citations. Be factual and concise."
+            )
         )
 
         raw = self._generate(
             consolidated_instruction,
             context,
             max_new_tokens=self.settings.intelligence_max_new_tokens,
+            output_language=output_language,
         )
         elapsed_ms = (perf_counter() - started) * 1000
         sections = _parse_comparison_sections(raw)
@@ -260,18 +303,19 @@ class ComparisonService(GroundedAnalysisService):
             model_used=self.generation_provider.model_name,
             elapsed_ms=round(elapsed_ms, 1),
             generation_calls=1,
+            output_language=output_language,
         )
 
 
 def _parse_comparison_sections(raw: str) -> dict[str, str]:
     """Parse a consolidated comparison response into named sections."""
     section_headers = [
-        ("common_themes", r"COMMON\s+THEMES\s*:?"),
-        ("differences", r"DIFFERENCES\s*:?"),
-        ("contradictions", r"CONTRADICTIONS\s*:?"),
-        ("methodologies", r"METHODOLOGIES\s*:?"),
-        ("conclusions", r"CONCLUSIONS\s*:?"),
-        ("limitations", r"LIMITATIONS\s*:?"),
+        ("common_themes", r"(?:COMMON\s+THEMES|الموضوعات\s+المشتركة)\s*:?"),
+        ("differences", r"(?:DIFFERENCES|الاختلافات)\s*:?"),
+        ("contradictions", r"(?:CONTRADICTIONS|التناقضات)\s*:?"),
+        ("methodologies", r"(?:METHODOLOGIES|المنهجيات)\s*:?"),
+        ("conclusions", r"(?:CONCLUSIONS|النتائج|الاستنتاجات)\s*:?"),
+        ("limitations", r"(?:LIMITATIONS|القيود)\s*:?"),
     ]
 
     # Build a combined pattern to split on any header
@@ -317,6 +361,10 @@ class ReportService(GroundedAnalysisService):
             knowledge_base_id=request.knowledge_base_id,
             document_ids=request.document_ids,
         )
+        output_language = resolve_output_language(
+            request.output_language,
+            request.objective or " ".join(source.text for source in context.sources),
+        )
         sections = {
             "executive_summary": (
                 f"Write a concise executive summary for this objective: {request.objective}"
@@ -335,30 +383,64 @@ class ReportService(GroundedAnalysisService):
                 f"Give cautious conclusions supported by sources for: {request.objective}"
             ),
         }
+        if output_language == "ar":
+            sections = {
+                "executive_summary": (
+                    f"اكتب ملخصاً تنفيذياً عربياً موجزاً لهذا الهدف: {request.objective}"
+                ),
+                "findings": (
+                    f"اعرض النتائج الرئيسية المدعومة بالأدلة لهذا الهدف: {request.objective}"
+                ),
+                "comparison": (
+                    "قارن وجهات نظر المصادر ونتائجها. إذا كان هناك مصدر واحد، فاشرح موضوعاته."
+                ),
+                "risks_and_limitations": (
+                    "حدد المخاطر والقيود والأدلة الناقصة المدعومة بالمصادر."
+                ),
+                "conclusions": (
+                    f"قدم استنتاجات حذرة ومدعومة بالمصادر لهذا الهدف: {request.objective}"
+                ),
+            }
 
         generated: dict[str, str] = {}
         generation_calls = 0
         for name, instruction in sections.items():
             try:
-                generated[name] = self._generate(instruction, context)
+                generated[name] = self._generate(
+                    instruction, context, output_language=output_language
+                )
                 generation_calls += 1
             except Exception:
                 logger.warning("Report section '%s' failed, using fallback", name, exc_info=True)
-                generated[name] = _SECTION_TIMEOUT_MSG
+                generated[name] = (
+                    "(انتهت مهلة إنشاء هذا القسم؛ تم استرجاع الأدلة لكن لم يكتمل التوليف.)"
+                    if output_language == "ar"
+                    else _SECTION_TIMEOUT_MSG
+                )
 
         elapsed_ms = (perf_counter() - started) * 1000
 
         markdown = (
             f"# {request.title}\n\n"
-            f"## Objective\n\n{request.objective}\n\n"
-            f"## Executive summary\n\n{generated['executive_summary']}\n\n"
-            f"## Findings\n\n{generated['findings']}\n\n"
-            f"## Comparison\n\n{generated['comparison']}\n\n"
-            f"## Risks and limitations\n\n{generated['risks_and_limitations']}\n\n"
-            f"## Conclusions\n\n{generated['conclusions']}\n"
+            f"## الهدف\n\n{request.objective}\n\n"
+            f"## الملخص التنفيذي\n\n{generated['executive_summary']}\n\n"
+            f"## النتائج\n\n{generated['findings']}\n\n"
+            f"## المقارنة\n\n{generated['comparison']}\n\n"
+            f"## المخاطر والقيود\n\n{generated['risks_and_limitations']}\n\n"
+            f"## الاستنتاجات\n\n{generated['conclusions']}\n"
+            if output_language == "ar"
+            else (
+                f"# {request.title}\n\n"
+                f"## Objective\n\n{request.objective}\n\n"
+                f"## Executive summary\n\n{generated['executive_summary']}\n\n"
+                f"## Findings\n\n{generated['findings']}\n\n"
+                f"## Comparison\n\n{generated['comparison']}\n\n"
+                f"## Risks and limitations\n\n{generated['risks_and_limitations']}\n\n"
+                f"## Conclusions\n\n{generated['conclusions']}\n"
+            )
         )
         verified_text = " ".join(generated.values())
-        partial = any(v == _SECTION_TIMEOUT_MSG for v in generated.values())
+        partial = any("timed out" in value or "انتهت مهلة" in value for value in generated.values())
 
         logger.info(
             "Report completed in %.0fms with %d generation calls, partial=%s",
@@ -378,4 +460,5 @@ class ReportService(GroundedAnalysisService):
             elapsed_ms=round(elapsed_ms, 1),
             generation_calls=generation_calls,
             partial=partial,
+            output_language=output_language,
         )

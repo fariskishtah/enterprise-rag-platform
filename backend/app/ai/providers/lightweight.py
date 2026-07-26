@@ -7,7 +7,7 @@ import numpy as np
 
 from app.ai.interfaces import EmbeddingProvider, GenerationProvider
 
-TOKEN_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
+TOKEN_PATTERN = re.compile(r"[^\W_][\w-]*", re.UNICODE)
 
 
 class HashingEmbeddingProvider(EmbeddingProvider):

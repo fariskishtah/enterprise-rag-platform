@@ -8,11 +8,12 @@ from sqlalchemy.orm import Session
 
 from app.ai.interfaces import EmbeddingProvider, GenerationProvider
 from app.ai.langchain_engine.chains import CourseChainSuite, format_documents
+from app.ai.langchain_engine.document_pipeline import EmbeddingModelMismatchError
 from app.ai.langchain_engine.runtime import LangChainEngineRuntime
 from app.ai.langchain_engine.schemas import GroundedAnswer, QueryRewriteResult, VerificationResult
 from app.ai.vectorstores.base import VectorSearchResult
 from app.core.config import Settings
-from app.core.errors import ModelProviderError, NotFoundError
+from app.core.errors import ConflictError, ModelProviderError, NotFoundError
 from app.models.conversation import ChatRole
 from app.repositories.knowledge_bases import KnowledgeBaseRepository
 from app.schemas.rag import (
@@ -22,7 +23,7 @@ from app.schemas.rag import (
     VerificationRead,
     VerificationStatus,
 )
-from app.services.answer_processing import NOT_FOUND_ANSWER
+from app.services.language import not_found_answer, resolve_output_language
 from app.services.rag import RagService
 
 
@@ -48,6 +49,7 @@ class LangChainRagService(RagService):
 
     def ask(self, knowledge_base_id: str, request: RagAskRequest) -> RagAnswerRead:
         started = perf_counter()
+        output_language = resolve_output_language(request.output_language, request.question)
         if KnowledgeBaseRepository(self.session).get(knowledge_base_id) is None:
             raise NotFoundError("Knowledge base")
         chat_session = self._resolve_session(
@@ -80,6 +82,13 @@ class LangChainRagService(RagService):
                 started=started,
                 explanation="No persisted LangChain FAISS index exists for this knowledge base.",
             )
+        except EmbeddingModelMismatchError as exc:
+            raise ConflictError(
+                code="embedding_model_reindex_required",
+                message=(
+                    "The embedding model changed. Reindex this knowledge base before searching."
+                ),
+            ) from exc
 
         suite = CourseChainSuite(
             llm=self.runtime.llm,
@@ -91,6 +100,11 @@ class LangChainRagService(RagService):
             state = suite.invoke(
                 question=request.question,
                 conversation_history=conversation_context,
+                answer_language_instruction=(
+                    "Answer in Arabic. Preserve names, dates, and numbers exactly."
+                    if output_language == "ar"
+                    else "Answer in English. Preserve names, dates, and numbers exactly."
+                ),
             )
         except OutputParserException as exc:
             raise ModelProviderError(
@@ -105,7 +119,7 @@ class LangChainRagService(RagService):
         sources = self._vector_results(documents)
         citations = self._citation_sources(parsed_answer, sources)
         not_found = parsed_answer.not_found or not parsed_answer.answer.strip() or not citations
-        answer = NOT_FOUND_ANSWER if not_found else parsed_answer.answer.strip()
+        answer = not_found_answer(output_language) if not_found else parsed_answer.answer.strip()
         verification = self._verification_read(parsed_verification, not_found=not_found)
 
         result = self._persist_answer(
@@ -155,8 +169,12 @@ class LangChainRagService(RagService):
             chat_session=chat_session,
             request=request,
             rewritten_query=request.question,
-            answer=NOT_FOUND_ANSWER,
-            direct_answer=NOT_FOUND_ANSWER,
+            answer=not_found_answer(
+                resolve_output_language(request.output_language, request.question)
+            ),
+            direct_answer=not_found_answer(
+                resolve_output_language(request.output_language, request.question)
+            ),
             supporting_explanation="",
             retrieved_sources=[],
             citation_sources=[],

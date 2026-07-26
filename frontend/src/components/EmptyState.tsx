@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { contentDirection } from "../utils/language";
 
 interface EmptyStateProps {
   title: string;
@@ -8,7 +9,7 @@ interface EmptyStateProps {
 
 export function EmptyState({ title, description, action }: EmptyStateProps) {
   return (
-    <div className="empty-state">
+    <div className="empty-state" dir={contentDirection(`${title} ${description}`)}>
       <div className="empty-icon" aria-hidden="true">
         +
       </div>
@@ -18,4 +19,3 @@ export function EmptyState({ title, description, action }: EmptyStateProps) {
     </div>
   );
 }
-

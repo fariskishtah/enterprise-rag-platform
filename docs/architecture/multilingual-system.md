@@ -12,8 +12,8 @@ flowchart TD
     DETECT --> PROMPT_LANG["Select System Prompt Language"]
     
     KB["Knowledge Base Selection"] --> EMBED_MODEL{"Check KB Embedding Model"}
-    EMBED_MODEL -- English --> MINI_LM["MiniLM-L6-v2 (384d)"]
-    EMBED_MODEL -- Multilingual --> MULTI_LM["paraphrase-multilingual-MiniLM-L12-v2 (384d)"]
+    EMBED_MODEL -- Existing English index --> MINI_LM["MiniLM-L6-v2 (384d)"]
+    EMBED_MODEL -- AWS multilingual --> MULTI_LM["multilingual-e5-small (384d)"]
     
     MINI_LM --> VECTOR_SEARCH["Vector Distance Search"]
     MULTI_LM --> VECTOR_SEARCH
@@ -27,6 +27,13 @@ flowchart TD
 ---
 
 ## Technical Considerations
-- **No Vector Mixing**: Knowledge bases enforce a single embedding model at creation time (`all-MiniLM-L6-v2` or `paraphrase-multilingual-MiniLM-L12-v2`).
-- **Modern Standard Arabic Prompts**: Structured Arabic system prompts enforce grounded answer formatting and passage markers (`[SOURCE:chunk_id]`).
-- **RTL UI Styling**: Frontend dynamically adjusts text direction (`dir="rtl"`) when Arabic mode is active.
+- **No Vector Mixing**: Each indexed chunk records its embedding model. Retrieval fails with
+  an explicit reindex requirement when the configured model differs.
+- **E5 Prefixes**: `multilingual-e5-small` receives `query:` for queries and `passage:` for
+  document/media chunks in both the custom and LangChain engines.
+- **Language Selection**: Automatic detection answers Arabic questions in Arabic and English
+  questions in English; users can override output with Arabic or English.
+- **Grounded Prompts**: Prompts preserve names, dates, numbers, and citations, and return a
+  localized not-found response when evidence is insufficient.
+- **RTL UI Styling**: The frontend applies `dir="rtl"` only to primarily Arabic content,
+  preserving readability for mixed Arabic/English answers.

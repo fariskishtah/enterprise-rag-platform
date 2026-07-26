@@ -4,10 +4,11 @@ import re
 from dataclasses import dataclass
 
 from app.ai.vectorstores.base import VectorSearchResult
+from app.services.language import not_found_answer
 from app.services.reranking import token_set
 
 SOURCE_MARKER_PATTERN = re.compile(r"\[SOURCE:([^\]]+)\]", re.IGNORECASE)
-SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[.!?])\s+|\n{2,}")
+SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[.!?؟])\s+|\n{2,}")
 NOT_FOUND_ANSWER = (
     "The supplied documents do not contain enough information to answer this question."
 )
@@ -30,12 +31,14 @@ class AnswerPostProcessor:
         raw_answer: str,
         sources: list[VectorSearchResult],
         response_mode: str,
+        output_language: str = "en",
     ) -> ProcessedAnswer:
+        fallback = not_found_answer(output_language)
         cited_ids = list(dict.fromkeys(SOURCE_MARKER_PATTERN.findall(raw_answer)))
         cleaned = SOURCE_MARKER_PATTERN.sub("", raw_answer)
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
         if not cleaned:
-            cleaned = NOT_FOUND_ANSWER
+            cleaned = fallback
 
         unique_sentences: list[str] = []
         normalized_seen: set[str] = set()
@@ -43,15 +46,15 @@ class AnswerPostProcessor:
             value = sentence.strip()
             if not value:
                 continue
-            normalized = re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+            normalized = re.sub(r"[^\w]+", " ", value.lower(), flags=re.UNICODE).strip()
             if normalized and normalized not in normalized_seen:
                 normalized_seen.add(normalized)
                 unique_sentences.append(value)
 
         limit = self._sentence_limit(question, response_mode)
         unique_sentences = unique_sentences[:limit]
-        visible = " ".join(unique_sentences).strip() or NOT_FOUND_ANSWER
-        direct = unique_sentences[0] if unique_sentences else NOT_FOUND_ANSWER
+        visible = " ".join(unique_sentences).strip() or fallback
+        direct = unique_sentences[0] if unique_sentences else fallback
         explanation = " ".join(unique_sentences[1:])
         copied_ratio = self._copied_context_ratio(visible, sources)
         return ProcessedAnswer(

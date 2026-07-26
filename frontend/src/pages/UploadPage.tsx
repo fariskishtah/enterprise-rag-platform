@@ -45,6 +45,7 @@ import type {
   KnowledgeBase,
   MediaSource,
 } from "../types";
+import { contentDirection, type OutputLanguage } from "../utils/language";
 
 type IntakeMode = "files" | "url";
 type SourceFilter = "all" | "documents" | "media";
@@ -69,6 +70,10 @@ export function UploadPage() {
   const [mode, setMode] = useState<IntakeMode>("files");
   const [files, setFiles] = useState<File[]>([]);
   const [url, setUrl] = useState("");
+  const [transcriptionLanguage, setTranscriptionLanguage] =
+    useState<OutputLanguage>("auto");
+  const [mediaOutputLanguage, setMediaOutputLanguage] =
+    useState<OutputLanguage>("auto");
   const [filter, setFilter] = useState<SourceFilter>("all");
   const [sortOrder, setSortOrder] = useState<"recent" | "name">("recent");
   const [search, setSearch] = useState("");
@@ -158,9 +163,11 @@ export function UploadPage() {
   }
 
   async function waitForMedia(source: MediaSource) {
+    let lastStatus = source.status;
     for (let attempt = 0; attempt < 480; attempt += 1) {
       await new Promise((resolve) => window.setTimeout(resolve, 1000));
       const current = await getMedia(source.id);
+      lastStatus = current.status;
       setProgress((value) => ({
         ...value,
         [source.id]: current.status_message ?? current.status,
@@ -171,7 +178,9 @@ export function UploadPage() {
       }
     }
     throw new Error(
-      "Media processing timed out. It may still be running; refresh the source library to check its status.",
+      lastStatus === "transcribing"
+        ? "Transcription timed out. Retry with the base model or a shorter media file."
+        : "Media processing timed out. It may still be running; refresh the source library to check its status.",
     );
   }
 
@@ -190,7 +199,12 @@ export function UploadPage() {
           setProgress((value) => ({ ...value, [source.id]: "Stored · extracting" }));
           await waitForDocument(source);
         } else {
-          const source = await uploadMedia(knowledgeBaseId, selected);
+          const source = await uploadMedia(
+            knowledgeBaseId,
+            selected,
+            transcriptionLanguage,
+            mediaOutputLanguage,
+          );
           setProgress((value) => ({ ...value, [source.id]: "Stored · validating media" }));
           await waitForMedia(source);
         }
@@ -213,7 +227,12 @@ export function UploadPage() {
     setUploading(true);
     setError(null);
     try {
-      const source = await linkMedia(knowledgeBaseId, url.trim());
+      const source = await linkMedia(
+        knowledgeBaseId,
+        url.trim(),
+        transcriptionLanguage,
+        mediaOutputLanguage,
+      );
       setProgress({ [source.id]: "Linked · retrieving safe metadata" });
       setUrl("");
       await waitForMedia(source);
@@ -232,7 +251,9 @@ export function UploadPage() {
     setRetryingIds((current) => new Set(current).add(sourceId));
     setError(null);
     try {
-      await (isMedia ? retryMedia(sourceId) : retryDocument(sourceId));
+      await (isMedia
+        ? retryMedia(sourceId, transcriptionLanguage, mediaOutputLanguage)
+        : retryDocument(sourceId));
       await loadSources();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to retry the source.");
@@ -312,7 +333,7 @@ export function UploadPage() {
         </label>
       </div>
 
-      {error && <div className="notice error" role="alert"><AlertCircle size={16} /> {error}</div>}
+      {error && <div className="notice error" role="alert" dir={contentDirection(error)}><AlertCircle size={16} /> {error}</div>}
       {success && <div className="notice success"><Check size={16} /> {success}</div>}
 
       <section className="intake-studio">
@@ -333,6 +354,41 @@ export function UploadPage() {
           >
             <Link2 size={17} /> Video link
           </button>
+        </div>
+
+        <div className="media-language-options">
+          <label>
+            Transcription language
+            <select
+              value={transcriptionLanguage}
+              onChange={(event) =>
+                setTranscriptionLanguage(event.target.value as OutputLanguage)
+              }
+              disabled={uploading}
+            >
+              <option value="auto">Automatic detection</option>
+              <option value="ar">Arabic</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+          <label>
+            Media intelligence language
+            <select
+              value={mediaOutputLanguage}
+              onChange={(event) =>
+                setMediaOutputLanguage(event.target.value as OutputLanguage)
+              }
+              disabled={uploading}
+            >
+              <option value="auto">Match transcript</option>
+              <option value="ar">Arabic</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+          <small>
+            These settings apply to audio, video, and YouTube sources. Direct MP3, MP4,
+            WAV, M4A, MOV, MKV, and WEBM uploads remain the reliable fallback.
+          </small>
         </div>
 
         {mode === "files" ? (

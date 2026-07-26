@@ -26,6 +26,7 @@
 - [Demo Video Package](docs/demo-video/demo-script.md) *(2-minute recruiter video script)*
 - [Evaluation System](docs/architecture/evaluation-system.md) *(Deterministic & benchmark evaluation)*
 - [Hugging Face Space Deployment Guide](docs/huggingface-spaces.md) *(Single-container Docker guide)*
+- [AWS Lightsail CPU Deployment](docs/aws-cpu-deployment.md) *(2 vCPU / 4 GB profile, cookies, and benchmarks)*
 
 ---
 
@@ -105,7 +106,9 @@ EnterpriseRAG ingests documents through a multi-stage pipeline:
 ## 7. Video Intelligence
 
 Process uploaded MP4/MKV/WAV files or public YouTube URLs:
-- **Transcription**: `faster-whisper` (`small` model on CPU/CUDA).
+- **Transcription**: `faster-whisper` (`tiny`, `base`, or `small`; CPU `int8`, Arabic/English/auto).
+- **Secure YouTube ingestion**: Optional read-only yt-dlp cookie file with safe terminal
+  authentication errors and direct-upload fallback.
 - **Segmentation**: Sentence-level timestamp alignment.
 - **Smart Chapters**: Automatic chapter boundaries and key points.
 - **Timestamp Citations**: Clicking a citation jumps directly to that timestamp in the embedded video player.
@@ -135,8 +138,9 @@ EnterpriseRAG includes a complete parallel engine built on **LangChain & LCEL**:
 ## 10. Arabic and Multilingual Support
 
 First-class support for Modern Standard Arabic and cross-lingual querying:
-- **Multilingual Embeddings**: `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` support.
-- **RTL Interface**: Dynamic Right-to-Left layout adjustment for Arabic UI labels.
+- **Multilingual Embeddings**: Benchmarked `intfloat/multilingual-e5-small` with correct
+  query/passage prefixes and explicit reindex protection.
+- **RTL Interface**: Dynamic right-to-left rendering for primarily Arabic content.
 - **Cross-Lingual QA**: Ask questions in Arabic against English documents or vice versa.
 
 ---
@@ -292,12 +296,15 @@ Key environment settings in `backend/.env` (or `.env.low-memory.example`):
 
 | Variable | Default | Description |
 | :--- | :--- | :--- |
-| `APP_RUNTIME_PROFILE` | `balanced` | Profile: `low_memory`, `balanced`, `quality`, or `huggingface_demo` |
+| `APP_RUNTIME_PROFILE` | `balanced` | Profile: `low_memory`, `balanced`, `quality`, `aws_cpu`, or `huggingface_demo` |
 | `RAG_ENGINE` | `custom` | Engine selection: `custom` or `langchain` |
 | `ENTERPRISE_RAG_GENERATION_MODEL_NAME` | `Qwen/Qwen2.5-0.5B-Instruct` | Local LLM Hugging Face model ID |
 | `ENTERPRISE_RAG_EMBEDDING_MODEL_NAME` | `sentence-transformers/all-MiniLM-L6-v2` | Embedding model ID |
 | `ENTERPRISE_RAG_MAX_CONCURRENT_GENERATIONS` | `2` | Process semaphore concurrency limit |
 | `ENTERPRISE_RAG_GENERATION_TIMEOUT_SECONDS` | `90` | Route generation timeout (seconds) |
+| `ENTERPRISE_RAG_YTDLP_COOKIES_FILE` | unset | Optional readable yt-dlp cookie file; never exposed by the API |
+| `ENTERPRISE_RAG_TRANSCRIPTION_LANGUAGE` | `auto` | Transcription language: `auto`, `ar`, or `en` |
+| `ENTERPRISE_RAG_WARM_MODELS_ON_STARTUP` | `false` | Non-blocking optional model warm-up |
 
 ---
 

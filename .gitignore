@@ -43,6 +43,9 @@ htmlcov/
 .env.*
 !.env.example
 !.env.low-memory.example
+!.env.aws-cpu.example
+*cookies*.txt
+cookies.txt
 
 # IDE files
 .vscode/
