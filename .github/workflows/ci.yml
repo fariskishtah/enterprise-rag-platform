@@ -26,7 +26,7 @@ jobs:
       - name: Run Ruff Linter
         run: ruff check backend/app/ backend/tests/
       - name: Run Pytest Suite
-        run: pytest backend/tests/ -v -k "not real_models and not real_transcription"
+        run: pytest backend/tests/ -v -m "not real_models and not real_transcription"
 
   frontend-checks:
     runs-on: ubuntu-latest

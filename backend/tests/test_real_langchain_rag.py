@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
 from langchain_core.language_models.llms import LLM
 
 from app.ai.langchain_engine.chains import CourseChainSuite
@@ -55,6 +56,7 @@ class RealRetrievalStructuredLLM(LLM):
         )
 
 
+@pytest.mark.real_models
 def test_real_huggingface_embeddings_faiss_retriever_lcel_and_parser(
     tmp_path: Path,
 ) -> None:
