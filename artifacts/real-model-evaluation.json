@@ -1,0 +1,101 @@
+{
+  "generated_at": "2026-07-26T04:35:19.392438+00:00",
+  "platform": "macOS-26.4.1-arm64-arm-64bit-Mach-O",
+  "python": "3.14.4",
+  "generation_model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "model_device": "mps",
+  "cold_models_loaded_from_local_cache": true,
+  "document_processing_and_first_embedding_ms": 4159.45,
+  "passed": 3,
+  "total": 3,
+  "cases": [
+    {
+      "question": "How many remote days are employees allowed per week?",
+      "required_terms": [
+        "three days"
+      ],
+      "answer": "Employees may work remotely for up to three days per week.",
+      "not_found": false,
+      "support_status": "fully_supported",
+      "confidence": 0.8317,
+      "citations": [
+        {
+          "document_id": "66c20403-b492-495a-bb51-80e3b46de4ef",
+          "document_name": "remote_work_policy.pdf",
+          "chunk_id": "4fe7be865655fa94d374836d2eccb9851725f4a2462b09890730ab4cdbcc944b",
+          "passage": "EnterpriseRAG Deterministic Remote Work Policy\nEmployees may work remotely for up to three days per week.\nTuesday and Thursday are designated collaboration days.",
+          "similarity_score": 0.8316546917496584,
+          "page_number": 1,
+          "section_index": 0,
+          "timestamp_start": null,
+          "timestamp_end": null,
+          "media_source_id": null,
+          "support_score": 0.8316546917496584
+        }
+      ],
+      "generation_model": "Qwen/Qwen2.5-0.5B-Instruct",
+      "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+      "timings_ms": {
+        "query_rewrite": 0.015,
+        "retrieval": 36.435,
+        "generation": 2887.047,
+        "total": 2951.738
+      },
+      "pass": true
+    },
+    {
+      "question": "How much is the home-office allowance and when is it available?",
+      "required_terms": [
+        "600",
+        "30 days"
+      ],
+      "answer": "The home-office allowance is GBP 600 and becomes available after 30 days of employment.",
+      "not_found": false,
+      "support_status": "fully_supported",
+      "confidence": 0.8787,
+      "citations": [
+        {
+          "document_id": "66c20403-b492-495a-bb51-80e3b46de4ef",
+          "document_name": "remote_work_policy.pdf",
+          "chunk_id": "90a26ec5b1d98a04d7d0282f272036f35898cc04fe80dea4d9a9137338ac7868",
+          "passage": "The home-office allowance is GBP 600 and becomes available after 30 days of employment.\nThe annual learning budget is GBP 1,200.\nThis policy does not state the CEO's name.",
+          "similarity_score": 0.8786859014954592,
+          "page_number": 1,
+          "section_index": 0,
+          "timestamp_start": null,
+          "timestamp_end": null,
+          "media_source_id": null,
+          "support_score": 0.8786859014954592
+        }
+      ],
+      "generation_model": "Qwen/Qwen2.5-0.5B-Instruct",
+      "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+      "timings_ms": {
+        "query_rewrite": 0.215,
+        "retrieval": 38.783,
+        "generation": 1009.201,
+        "total": 1058.818
+      },
+      "pass": true
+    },
+    {
+      "question": "Who is the CEO?",
+      "required_terms": [],
+      "answer": "The supplied documents do not contain enough information to answer this question.",
+      "not_found": true,
+      "support_status": "missing_answer",
+      "confidence": 0.0,
+      "citations": [],
+      "generation_model": "Qwen/Qwen2.5-0.5B-Instruct",
+      "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+      "timings_ms": {
+        "query_rewrite": 0.007,
+        "retrieval": 41.061,
+        "generation": 0.0,
+        "total": 45.051
+      },
+      "pass": true
+    }
+  ]
+}

@@ -1,0 +1,501 @@
+{
+  "generated_at": "2026-07-26T04:35:22.566204+00:00",
+  "document": {
+    "id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+    "extracted_characters": 558,
+    "page_count": 1,
+    "chunks": 3
+  },
+  "cases": [
+    {
+      "question": "How many remote days are employees allowed per week?",
+      "expected": "Up to three days per week.",
+      "generated_answer": "Employees may work remotely for up to three days per week.",
+      "retrieved_passages": [
+        {
+          "chunk_id": "aa483dc7ec285a7625a4caa41c265beedcece343fa580843d7006f7fa16fccbe",
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "text": "EnterpriseRAG Deterministic Remote Work Policy\nEmployees may work remotely for up to three days per week.\nTuesday and Thursday are designated collaboration days.",
+          "score": 0.7831837416230104,
+          "page_number": 1,
+          "section_index": 0,
+          "chunk_index": 0,
+          "metadata": {
+            "source_kind": "pdf_page",
+            "page_number": 1,
+            "heading": null,
+            "section_index": 0
+          },
+          "dense_score": 0.44905024766921997,
+          "lexical_score": 1.0,
+          "reranking_score": 0.6285897435897437,
+          "query_coverage": 0.8333333333333334
+        },
+        {
+          "chunk_id": "621b600e25c68ccf08e9bc1f194b1565f4485c90f18bc5130f605a33941322e1",
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "text": "An employee may request a fully remote arrangement when the employee lives more than 120 kilometres from the assigned office.\nThe fully remote arrangement requires approval from the department director and People Operations.",
+          "score": 0.3244508363621066,
+          "page_number": 1,
+          "section_index": 0,
+          "chunk_index": 1,
+          "metadata": {
+            "source_kind": "pdf_page",
+            "page_number": 1,
+            "heading": null,
+            "section_index": 0
+          },
+          "dense_score": 0.08989332616329193,
+          "lexical_score": 0.14948455767658922,
+          "reranking_score": 0.1375178826895565,
+          "query_coverage": 0.16666666666666666
+        },
+        {
+          "chunk_id": "63984c2769a8ccd65ebdb92f8ae4d7fd87d935610ce5712d0aa7fb90ecf6505e",
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "text": "The home-office allowance is GBP 600 and becomes available after 30 days of employment.\nThe annual learning budget is GBP 1,200.\nThis policy does not state the CEO's name.",
+          "score": 0.3055891440552891,
+          "page_number": 1,
+          "section_index": 0,
+          "chunk_index": 2,
+          "metadata": {
+            "source_kind": "pdf_page",
+            "page_number": 1,
+            "heading": null,
+            "section_index": 0
+          },
+          "dense_score": 0.05205792188644409,
+          "lexical_score": 0.11366823535066052,
+          "reranking_score": 0.1391025641025641,
+          "query_coverage": 0.16666666666666666
+        }
+      ],
+      "citations": [
+        {
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "chunk_id": "aa483dc7ec285a7625a4caa41c265beedcece343fa580843d7006f7fa16fccbe",
+          "passage": "EnterpriseRAG Deterministic Remote Work Policy\nEmployees may work remotely for up to three days per week.\nTuesday and Thursday are designated collaboration days.",
+          "similarity_score": 0.7831837416230104,
+          "page_number": 1,
+          "section_index": 0,
+          "timestamp_start": null,
+          "timestamp_end": null,
+          "media_source_id": null,
+          "support_score": 0.7831837416230104
+        }
+      ],
+      "support_status": "fully_supported",
+      "not_found": false,
+      "pass": true,
+      "latency_ms": 7.599,
+      "started_at": "2026-07-26T04:35:22.526984+00:00"
+    },
+    {
+      "question": "Which days are designated collaboration days?",
+      "expected": "Tuesday and Thursday.",
+      "generated_answer": "Tuesday and Thursday are designated collaboration days.",
+      "retrieved_passages": [
+        {
+          "chunk_id": "aa483dc7ec285a7625a4caa41c265beedcece343fa580843d7006f7fa16fccbe",
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "text": "EnterpriseRAG Deterministic Remote Work Policy\nEmployees may work remotely for up to three days per week.\nTuesday and Thursday are designated collaboration days.",
+          "score": 0.8472361021325098,
+          "page_number": 1,
+          "section_index": 0,
+          "chunk_index": 0,
+          "metadata": {
+            "source_kind": "pdf_page",
+            "page_number": 1,
+            "heading": null,
+            "section_index": 0
+          },
+          "dense_score": 0.47628968954086304,
+          "lexical_score": 1.0,
+          "reranking_score": 0.8602836879432624,
+          "query_coverage": 1.0
+        },
+        {
+          "chunk_id": "63984c2769a8ccd65ebdb92f8ae4d7fd87d935610ce5712d0aa7fb90ecf6505e",
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "text": "The home-office allowance is GBP 600 and becomes available after 30 days of employment.\nThe annual learning budget is GBP 1,200.\nThis policy does not state the CEO's name.",
+          "score": 0.3507111601628474,
+          "page_number": 1,
+          "section_index": 0,
+          "chunk_index": 2,
+          "metadata": {
+            "source_kind": "pdf_page",
+            "page_number": 1,
+            "heading": null,
+            "section_index": 0
+          },
+          "dense_score": 0.05521576851606369,
+          "lexical_score": 0.17706981860022145,
+          "reranking_score": 0.24066666666666667,
+          "query_coverage": 0.3333333333333333
+        },
+        {
+          "chunk_id": "621b600e25c68ccf08e9bc1f194b1565f4485c90f18bc5130f605a33941322e1",
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "text": "An employee may request a fully remote arrangement when the employee lives more than 120 kilometres from the assigned office.\nThe fully remote arrangement requires approval from the department director and People Operations.",
+          "score": 0.23053097345132745,
+          "page_number": 1,
+          "section_index": 0,
+          "chunk_index": 1,
+          "metadata": {
+            "source_kind": "pdf_page",
+            "page_number": 1,
+            "heading": null,
+            "section_index": 0
+          },
+          "dense_score": 0.0,
+          "lexical_score": 0.0,
+          "reranking_score": 0.022123893805309738,
+          "query_coverage": 0.0
+        }
+      ],
+      "citations": [
+        {
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "chunk_id": "aa483dc7ec285a7625a4caa41c265beedcece343fa580843d7006f7fa16fccbe",
+          "passage": "EnterpriseRAG Deterministic Remote Work Policy\nEmployees may work remotely for up to three days per week.\nTuesday and Thursday are designated collaboration days.",
+          "similarity_score": 0.8472361021325098,
+          "page_number": 1,
+          "section_index": 0,
+          "timestamp_start": null,
+          "timestamp_end": null,
+          "media_source_id": null,
+          "support_score": 0.8472361021325098
+        }
+      ],
+      "support_status": "fully_supported",
+      "not_found": false,
+      "pass": true,
+      "latency_ms": 4.127,
+      "started_at": "2026-07-26T04:35:22.539031+00:00"
+    },
+    {
+      "question": "When can an employee request a fully remote arrangement?",
+      "expected": "More than 120 kilometres from the assigned office, with approval.",
+      "generated_answer": "An employee may request a fully remote arrangement when the employee lives more than 120 kilometres from the assigned office.",
+      "retrieved_passages": [
+        {
+          "chunk_id": "621b600e25c68ccf08e9bc1f194b1565f4485c90f18bc5130f605a33941322e1",
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "text": "An employee may request a fully remote arrangement when the employee lives more than 120 kilometres from the assigned office.\nThe fully remote arrangement requires approval from the department director and People Operations.",
+          "score": 0.8643807726444575,
+          "page_number": 1,
+          "section_index": 0,
+          "chunk_index": 1,
+          "metadata": {
+            "source_kind": "pdf_page",
+            "page_number": 1,
+            "heading": null,
+            "section_index": 0
+          },
+          "dense_score": 0.5393599271774292,
+          "lexical_score": 1.0,
+          "reranking_score": 0.8720991561181435,
+          "query_coverage": 1.0
+        },
+        {
+          "chunk_id": "aa483dc7ec285a7625a4caa41c265beedcece343fa580843d7006f7fa16fccbe",
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "text": "EnterpriseRAG Deterministic Remote Work Policy\nEmployees may work remotely for up to three days per week.\nTuesday and Thursday are designated collaboration days.",
+          "score": 0.3058024699510546,
+          "page_number": 1,
+          "section_index": 0,
+          "chunk_index": 0,
+          "metadata": {
+            "source_kind": "pdf_page",
+            "page_number": 1,
+            "heading": null,
+            "section_index": 0
+          },
+          "dense_score": 0.06415003538131714,
+          "lexical_score": 0.08860759943151401,
+          "reranking_score": 0.15914572864321608,
+          "query_coverage": 0.2
+        },
+        {
+          "chunk_id": "63984c2769a8ccd65ebdb92f8ae4d7fd87d935610ce5712d0aa7fb90ecf6505e",
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "text": "The home-office allowance is GBP 600 and becomes available after 30 days of employment.\nThe annual learning budget is GBP 1,200.\nThis policy does not state the CEO's name.",
+          "score": 0.2293010752688172,
+          "page_number": 1,
+          "section_index": 0,
+          "chunk_index": 2,
+          "metadata": {
+            "source_kind": "pdf_page",
+            "page_number": 1,
+            "heading": null,
+            "section_index": 0
+          },
+          "dense_score": 0.0,
+          "lexical_score": 0.0,
+          "reranking_score": 0.01720430107526882,
+          "query_coverage": 0.0
+        }
+      ],
+      "citations": [
+        {
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "chunk_id": "621b600e25c68ccf08e9bc1f194b1565f4485c90f18bc5130f605a33941322e1",
+          "passage": "An employee may request a fully remote arrangement when the employee lives more than 120 kilometres from the assigned office.\nThe fully remote arrangement requires approval from the department director and People Operations.",
+          "similarity_score": 0.8643807726444575,
+          "page_number": 1,
+          "section_index": 0,
+          "timestamp_start": null,
+          "timestamp_end": null,
+          "media_source_id": null,
+          "support_score": 0.8643807726444575
+        }
+      ],
+      "support_status": "fully_supported",
+      "not_found": false,
+      "pass": true,
+      "latency_ms": 4.222,
+      "started_at": "2026-07-26T04:35:22.544422+00:00"
+    },
+    {
+      "question": "Who must approve the fully remote arrangement?",
+      "expected": "The department director and People Operations.",
+      "generated_answer": "The fully remote arrangement requires approval from the department director and People Operations. An employee may request a fully remote arrangement when the employee lives more than 120 kilometres from the assigned office.",
+      "retrieved_passages": [
+        {
+          "chunk_id": "621b600e25c68ccf08e9bc1f194b1565f4485c90f18bc5130f605a33941322e1",
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "text": "An employee may request a fully remote arrangement when the employee lives more than 120 kilometres from the assigned office.\nThe fully remote arrangement requires approval from the department director and People Operations.",
+          "score": 0.7886982644234459,
+          "page_number": 1,
+          "section_index": 0,
+          "chunk_index": 1,
+          "metadata": {
+            "source_kind": "pdf_page",
+            "page_number": 1,
+            "heading": null,
+            "section_index": 0
+          },
+          "dense_score": 0.5606119632720947,
+          "lexical_score": 1.0,
+          "reranking_score": 0.5502422907488987,
+          "query_coverage": 0.6
+        },
+        {
+          "chunk_id": "aa483dc7ec285a7625a4caa41c265beedcece343fa580843d7006f7fa16fccbe",
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "text": "EnterpriseRAG Deterministic Remote Work Policy\nEmployees may work remotely for up to three days per week.\nTuesday and Thursday are designated collaboration days.",
+          "score": 0.3233584935213115,
+          "page_number": 1,
+          "section_index": 0,
+          "chunk_index": 0,
+          "metadata": {
+            "source_kind": "pdf_page",
+            "page_number": 1,
+            "heading": null,
+            "section_index": 0
+          },
+          "dense_score": 0.07273930311203003,
+          "lexical_score": 0.14998265274583425,
+          "reranking_score": 0.147989417989418,
+          "query_coverage": 0.2
+        },
+        {
+          "chunk_id": "63984c2769a8ccd65ebdb92f8ae4d7fd87d935610ce5712d0aa7fb90ecf6505e",
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "text": "The home-office allowance is GBP 600 and becomes available after 30 days of employment.\nThe annual learning budget is GBP 1,200.\nThis policy does not state the CEO's name.",
+          "score": 0.26938944482667876,
+          "page_number": 1,
+          "section_index": 0,
+          "chunk_index": 2,
+          "metadata": {
+            "source_kind": "pdf_page",
+            "page_number": 1,
+            "heading": null,
+            "section_index": 0
+          },
+          "dense_score": 0.17708440124988556,
+          "lexical_score": 0.0,
+          "reranking_score": 0.018181818181818184,
+          "query_coverage": 0.0
+        }
+      ],
+      "citations": [
+        {
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "chunk_id": "621b600e25c68ccf08e9bc1f194b1565f4485c90f18bc5130f605a33941322e1",
+          "passage": "An employee may request a fully remote arrangement when the employee lives more than 120 kilometres from the assigned office.\nThe fully remote arrangement requires approval from the department director and People Operations.",
+          "similarity_score": 0.7886982644234459,
+          "page_number": 1,
+          "section_index": 0,
+          "timestamp_start": null,
+          "timestamp_end": null,
+          "media_source_id": null,
+          "support_score": 0.7886982644234459
+        }
+      ],
+      "support_status": "fully_supported",
+      "not_found": false,
+      "pass": true,
+      "latency_ms": 4.119,
+      "started_at": "2026-07-26T04:35:22.549919+00:00"
+    },
+    {
+      "question": "How much is the home-office allowance and when is it available?",
+      "expected": "GBP 600 after 30 days of employment.",
+      "generated_answer": "The home-office allowance is GBP 600 and becomes available after 30 days of employment.",
+      "retrieved_passages": [
+        {
+          "chunk_id": "63984c2769a8ccd65ebdb92f8ae4d7fd87d935610ce5712d0aa7fb90ecf6505e",
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "text": "The home-office allowance is GBP 600 and becomes available after 30 days of employment.\nThe annual learning budget is GBP 1,200.\nThis policy does not state the CEO's name.",
+          "score": 0.835021510156634,
+          "page_number": 1,
+          "section_index": 0,
+          "chunk_index": 2,
+          "metadata": {
+            "source_kind": "pdf_page",
+            "page_number": 1,
+            "heading": null,
+            "section_index": 0
+          },
+          "dense_score": 0.4764629006385803,
+          "lexical_score": 1.0,
+          "reranking_score": 0.8112694300518135,
+          "query_coverage": 1.0
+        },
+        {
+          "chunk_id": "621b600e25c68ccf08e9bc1f194b1565f4485c90f18bc5130f605a33941322e1",
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "text": "An employee may request a fully remote arrangement when the employee lives more than 120 kilometres from the assigned office.\nThe fully remote arrangement requires approval from the department director and People Operations.",
+          "score": 0.2834789498052636,
+          "page_number": 1,
+          "section_index": 0,
+          "chunk_index": 1,
+          "metadata": {
+            "source_kind": "pdf_page",
+            "page_number": 1,
+            "heading": null,
+            "section_index": 0
+          },
+          "dense_score": 0.22438731789588928,
+          "lexical_score": 0.0,
+          "reranking_score": 0.0319672131147541,
+          "query_coverage": 0.0
+        },
+        {
+          "chunk_id": "aa483dc7ec285a7625a4caa41c265beedcece343fa580843d7006f7fa16fccbe",
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "text": "EnterpriseRAG Deterministic Remote Work Policy\nEmployees may work remotely for up to three days per week.\nTuesday and Thursday are designated collaboration days.",
+          "score": 0.24162126230437633,
+          "page_number": 1,
+          "section_index": 0,
+          "chunk_index": 0,
+          "metadata": {
+            "source_kind": "pdf_page",
+            "page_number": 1,
+            "heading": null,
+            "section_index": 0
+          },
+          "dense_score": 0.053376052528619766,
+          "lexical_score": 0.0,
+          "reranking_score": 0.018446601941747572,
+          "query_coverage": 0.0
+        }
+      ],
+      "citations": [
+        {
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "chunk_id": "63984c2769a8ccd65ebdb92f8ae4d7fd87d935610ce5712d0aa7fb90ecf6505e",
+          "passage": "The home-office allowance is GBP 600 and becomes available after 30 days of employment.\nThe annual learning budget is GBP 1,200.\nThis policy does not state the CEO's name.",
+          "similarity_score": 0.835021510156634,
+          "page_number": 1,
+          "section_index": 0,
+          "timestamp_start": null,
+          "timestamp_end": null,
+          "media_source_id": null,
+          "support_score": 0.835021510156634
+        }
+      ],
+      "support_status": "fully_supported",
+      "not_found": false,
+      "pass": true,
+      "latency_ms": 4.228,
+      "started_at": "2026-07-26T04:35:22.555248+00:00"
+    },
+    {
+      "question": "Who is the CEO?",
+      "expected": "Not found.",
+      "generated_answer": "The supplied documents do not contain enough information to answer this question.",
+      "retrieved_passages": [
+        {
+          "chunk_id": "63984c2769a8ccd65ebdb92f8ae4d7fd87d935610ce5712d0aa7fb90ecf6505e",
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "text": "The home-office allowance is GBP 600 and becomes available after 30 days of employment.\nThe annual learning budget is GBP 1,200.\nThis policy does not state the CEO's name.",
+          "score": 0.33421038856280266,
+          "page_number": 1,
+          "section_index": 0,
+          "chunk_index": 2,
+          "metadata": {
+            "source_kind": "pdf_page",
+            "page_number": 1,
+            "heading": null,
+            "section_index": 0
+          },
+          "dense_score": 0.46852126717567444,
+          "lexical_score": 0.0,
+          "reranking_score": 0.015172413793103448,
+          "query_coverage": 0.0
+        },
+        {
+          "chunk_id": "621b600e25c68ccf08e9bc1f194b1565f4485c90f18bc5130f605a33941322e1",
+          "document_id": "f61cca4b-3fbc-4afb-a956-24ea5038ee11",
+          "document_name": "remote_work_policy.pdf",
+          "text": "An employee may request a fully remote arrangement when the employee lives more than 120 kilometres from the assigned office.\nThe fully remote arrangement requires approval from the department director and People Operations.",
+          "score": 0.2887392162972567,
+          "page_number": 1,
+          "section_index": 0,
+          "chunk_index": 1,
+          "metadata": {
+            "source_kind": "pdf_page",
+            "page_number": 1,
+            "heading": null,
+            "section_index": 0
+          },
+          "dense_score": 0.2696799635887146,
+          "lexical_score": 0.0,
+          "reranking_score": 0.012244897959183675,
+          "query_coverage": 0.0
+        }
+      ],
+      "citations": [],
+      "support_status": "missing_answer",
+      "not_found": true,
+      "pass": true,
+      "latency_ms": 3.478,
+      "started_at": "2026-07-26T04:35:22.560725+00:00"
+    }
+  ],
+  "passed": 6,
+  "total": 6
+}

@@ -1,0 +1,13 @@
+{
+  "model": "faster-whisper/tiny",
+  "language": "en",
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 4.0,
+      "text": "The Atlas review happens on Tuesday, my dear owns the launch checklist.",
+      "confidence": 0.630815408820612
+    }
+  ],
+  "elapsed_seconds": 2.458
+}

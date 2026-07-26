@@ -1,0 +1,50 @@
+.DS_Store
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+backend/data/
+backend/.coverage
+frontend/node_modules/
+frontend/dist/
+*.log
+
+# Local databases and generated data
+*.db
+*.sqlite
+*.sqlite3
+uploads/
+temp/
+tmp/
+
+# Model and Hugging Face caches
+models/
+model_cache/
+.cache/
+huggingface/
+**/.cache/
+
+# Python environments
+backend/.venv/
+venv/
+
+# Test and generated artifacts
+playwright-report/
+test-results/
+coverage/
+htmlcov/
+
+# Local secrets and overrides
+.env.*
+!.env.example
+!.env.low-memory.example
+
+# IDE files
+.vscode/
+.idea/
+
+# Runtime data and downloaded models
+data/

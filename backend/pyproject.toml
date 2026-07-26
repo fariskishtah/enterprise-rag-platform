@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "enterprise-rag-backend"
+version = "0.1.0"
+description = "Local knowledge intelligence and grounded RAG API"
+requires-python = ">=3.11"
+dependencies = [
+  "alembic>=1.14,<2.0",
+  "docx2txt==0.9",
+  "faiss-cpu==1.14.3",
+  "fastapi>=0.115,<1.0",
+  "httpx>=0.28,<1.0",
+  "langchain==1.3.14",
+  "langchain-community==0.4.2",
+  "langchain-core==1.5.1",
+  "langchain-huggingface==1.2.2",
+  "langchain-text-splitters==1.1.2",
+  "numpy>=2.1,<3.0",
+  "pydantic==2.13.4",
+  "pydantic-settings>=2.7,<3.0",
+  "pypdf>=5.1,<7.0",
+  "python-docx>=1.1,<2.0",
+  "python-multipart>=0.0.20,<1.0",
+  "sentence-transformers>=5.1,<6.0",
+  "sqlalchemy>=2.0.36,<3.0",
+  "torch>=2.7,<3.0",
+  "transformers==4.57.6",
+  "uvicorn[standard]>=0.34,<1.0",
+  "yt-dlp>=2025.6.30",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<10.0",
+  "ruff>=0.9,<1.0",
+]
+media = [
+  "faster-whisper>=1.1,<2.0",
+]
+course = [
+  "accelerate==1.14.0",
+  "bitsandbytes==0.50.0; platform_system == 'Linux' and platform_machine == 'x86_64'",
+  "datasets==5.0.0",
+  "peft==0.19.1",
+  "pyngrok==8.1.2",
+  "streamlit==1.60.0",
+  "trl==1.9.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+pythonpath = ["."]
+markers = [
+  "real_models: uses downloaded open-source Hugging Face models on local CPU",
+  "real_transcription: uses a downloaded faster-whisper model on local audio",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]

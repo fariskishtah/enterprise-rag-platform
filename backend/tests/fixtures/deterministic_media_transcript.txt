@@ -1,0 +1,5 @@
+Welcome to the EnterpriseRAG media quality test.
+The Atlas launch review is scheduled for Tuesday at 10 AM.
+Maya owns the deployment checklist and must finish it by Friday.
+The team agreed to use the blue release channel.
+The unresolved issue is the mobile authentication timeout.

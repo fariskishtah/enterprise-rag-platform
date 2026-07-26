@@ -1,0 +1,277 @@
+{
+  "custom": [
+    {
+      "question": "How many remote days are employees allowed per week?",
+      "answer": "Employees may work remotely for up to three days per week.",
+      "citations": [
+        {
+          "document_id": "d5ec5b28-bafb-49f0-a953-c91fc1287f4f",
+          "document_name": "remote_work_policy.pdf",
+          "chunk_id": "6d6e96caaabc607864f791b030daa166473878230cdaf03f26f7643c9fe1ae2c",
+          "passage": "EnterpriseRAG Deterministic Remote Work Policy\nEmployees may work remotely for up to three days per week.\nTuesday and Thursday are designated collaboration days.",
+          "similarity_score": 0.7831837416230104,
+          "page_number": 1,
+          "section_index": 0,
+          "timestamp_start": null,
+          "timestamp_end": null,
+          "media_source_id": null,
+          "support_score": 0.7831837416230104
+        }
+      ],
+      "not_found": false,
+      "retrieved": true,
+      "retrieval_hit": true,
+      "citation_valid": true,
+      "latency_ms": 40.9173330408521,
+      "passed": true
+    },
+    {
+      "question": "Which days are designated collaboration days?",
+      "answer": "Tuesday and Thursday are designated collaboration days.",
+      "citations": [
+        {
+          "document_id": "d5ec5b28-bafb-49f0-a953-c91fc1287f4f",
+          "document_name": "remote_work_policy.pdf",
+          "chunk_id": "6d6e96caaabc607864f791b030daa166473878230cdaf03f26f7643c9fe1ae2c",
+          "passage": "EnterpriseRAG Deterministic Remote Work Policy\nEmployees may work remotely for up to three days per week.\nTuesday and Thursday are designated collaboration days.",
+          "similarity_score": 0.8472361021325098,
+          "page_number": 1,
+          "section_index": 0,
+          "timestamp_start": null,
+          "timestamp_end": null,
+          "media_source_id": null,
+          "support_score": 0.8472361021325098
+        }
+      ],
+      "not_found": false,
+      "retrieved": true,
+      "retrieval_hit": true,
+      "citation_valid": true,
+      "latency_ms": 14.21670796116814,
+      "passed": true
+    },
+    {
+      "question": "When can an employee request a fully remote arrangement?",
+      "answer": "An employee may request a fully remote arrangement when the employee lives more than 120 kilometres from the assigned office.",
+      "citations": [
+        {
+          "document_id": "d5ec5b28-bafb-49f0-a953-c91fc1287f4f",
+          "document_name": "remote_work_policy.pdf",
+          "chunk_id": "9e8736cd0a2ae8b84ae4682a4d2a3b03d95241d3df64e4746d2628cec250b08b",
+          "passage": "An employee may request a fully remote arrangement when the employee lives more than 120 kilometres from the assigned office.\nThe fully remote arrangement requires approval from the department director and People Operations.",
+          "similarity_score": 0.8643807726444575,
+          "page_number": 1,
+          "section_index": 0,
+          "timestamp_start": null,
+          "timestamp_end": null,
+          "media_source_id": null,
+          "support_score": 0.8643807726444575
+        }
+      ],
+      "not_found": false,
+      "retrieved": true,
+      "retrieval_hit": true,
+      "citation_valid": true,
+      "latency_ms": 12.504124955739826,
+      "passed": true
+    },
+    {
+      "question": "Who must approve the fully remote arrangement?",
+      "answer": "The fully remote arrangement requires approval from the department director and People Operations. An employee may request a fully remote arrangement when the employee lives more than 120 kilometres from the assigned office.",
+      "citations": [
+        {
+          "document_id": "d5ec5b28-bafb-49f0-a953-c91fc1287f4f",
+          "document_name": "remote_work_policy.pdf",
+          "chunk_id": "9e8736cd0a2ae8b84ae4682a4d2a3b03d95241d3df64e4746d2628cec250b08b",
+          "passage": "An employee may request a fully remote arrangement when the employee lives more than 120 kilometres from the assigned office.\nThe fully remote arrangement requires approval from the department director and People Operations.",
+          "similarity_score": 0.7886982644234459,
+          "page_number": 1,
+          "section_index": 0,
+          "timestamp_start": null,
+          "timestamp_end": null,
+          "media_source_id": null,
+          "support_score": 0.7886982644234459
+        }
+      ],
+      "not_found": false,
+      "retrieved": true,
+      "retrieval_hit": true,
+      "citation_valid": true,
+      "latency_ms": 12.589790974743664,
+      "passed": true
+    },
+    {
+      "question": "How much is the home-office allowance and when is it available?",
+      "answer": "The home-office allowance is GBP 600 and becomes available after 30 days of employment.",
+      "citations": [
+        {
+          "document_id": "d5ec5b28-bafb-49f0-a953-c91fc1287f4f",
+          "document_name": "remote_work_policy.pdf",
+          "chunk_id": "07d559b00699dad4a9f4b1d59aa2d150c9aef524dad897b9590ecf7d2a8d9d07",
+          "passage": "The home-office allowance is GBP 600 and becomes available after 30 days of employment.\nThe annual learning budget is GBP 1,200.\nThis policy does not state the CEO's name.",
+          "similarity_score": 0.835021510156634,
+          "page_number": 1,
+          "section_index": 0,
+          "timestamp_start": null,
+          "timestamp_end": null,
+          "media_source_id": null,
+          "support_score": 0.835021510156634
+        }
+      ],
+      "not_found": false,
+      "retrieved": true,
+      "retrieval_hit": true,
+      "citation_valid": true,
+      "latency_ms": 15.40387503337115,
+      "passed": true
+    },
+    {
+      "question": "Who is the CEO?",
+      "answer": "The supplied documents do not contain enough information to answer this question.",
+      "citations": [],
+      "not_found": true,
+      "retrieved": true,
+      "retrieval_hit": true,
+      "citation_valid": true,
+      "latency_ms": 26.386375015135854,
+      "passed": true
+    }
+  ],
+  "langchain": [
+    {
+      "question": "How many remote days are employees allowed per week?",
+      "answer": "Employees may work remotely for up to three days per week.",
+      "citations": [
+        {
+          "document_id": "deterministic-policy",
+          "source_filename": "remote_work_policy.pdf",
+          "chunk_id": "2bbd33501718a402afac7a043fc9d7c7968d18748b78bd1b4fab971bf6bec413",
+          "quote": "Employees may work remotely for up to three days per week.",
+          "page": 1,
+          "section": 0
+        }
+      ],
+      "not_found": false,
+      "retrieved": true,
+      "retrieval_hit": true,
+      "citation_valid": true,
+      "latency_ms": 33.441249979659915,
+      "passed": true
+    },
+    {
+      "question": "Which days are designated collaboration days?",
+      "answer": "Tuesday and Thursday are designated collaboration days.",
+      "citations": [
+        {
+          "document_id": "deterministic-policy",
+          "source_filename": "remote_work_policy.pdf",
+          "chunk_id": "2bbd33501718a402afac7a043fc9d7c7968d18748b78bd1b4fab971bf6bec413",
+          "quote": "Tuesday and Thursday are designated collaboration days.",
+          "page": 1,
+          "section": 0
+        }
+      ],
+      "not_found": false,
+      "retrieved": true,
+      "retrieval_hit": true,
+      "citation_valid": true,
+      "latency_ms": 19.421583972871304,
+      "passed": true
+    },
+    {
+      "question": "When can an employee request a fully remote arrangement?",
+      "answer": "An employee may request a fully remote arrangement when they live more than 120 kilometres from the assigned office.",
+      "citations": [
+        {
+          "document_id": "deterministic-policy",
+          "source_filename": "remote_work_policy.pdf",
+          "chunk_id": "63fb7e8410771b8abad7018f2d4c9cd00aed7cb80e71405f7ef2810d0bba15cb",
+          "quote": "An employee may request a fully remote arrangement when they live more than 120 kilometres from the assigned office.",
+          "page": 1,
+          "section": 0
+        }
+      ],
+      "not_found": false,
+      "retrieved": true,
+      "retrieval_hit": true,
+      "citation_valid": true,
+      "latency_ms": 20.81266703316942,
+      "passed": true
+    },
+    {
+      "question": "Who must approve the fully remote arrangement?",
+      "answer": "The fully remote arrangement requires approval from the department director and People Operations.",
+      "citations": [
+        {
+          "document_id": "deterministic-policy",
+          "source_filename": "remote_work_policy.pdf",
+          "chunk_id": "d44323224f502bd697ba12a17b204940bf301dbabc3f9c7a96999140781702e8",
+          "quote": "The fully remote arrangement requires approval from the department director and People Operations.",
+          "page": 1,
+          "section": 0
+        }
+      ],
+      "not_found": false,
+      "retrieved": true,
+      "retrieval_hit": true,
+      "citation_valid": true,
+      "latency_ms": 20.0774580007419,
+      "passed": true
+    },
+    {
+      "question": "How much is the home-office allowance and when is it available?",
+      "answer": "The home-office allowance is GBP 600 and becomes available after 30 days of employment.",
+      "citations": [
+        {
+          "document_id": "deterministic-policy",
+          "source_filename": "remote_work_policy.pdf",
+          "chunk_id": "d44323224f502bd697ba12a17b204940bf301dbabc3f9c7a96999140781702e8",
+          "quote": "The home-office allowance is GBP 600 and becomes available after 30 days of employment.",
+          "page": 1,
+          "section": 0
+        }
+      ],
+      "not_found": false,
+      "retrieved": true,
+      "retrieval_hit": true,
+      "citation_valid": true,
+      "latency_ms": 21.280250046402216,
+      "passed": true
+    },
+    {
+      "question": "Who is the CEO?",
+      "answer": "The supplied documents do not contain enough information to answer this question.",
+      "citations": [],
+      "not_found": true,
+      "retrieved": true,
+      "retrieval_hit": true,
+      "citation_valid": true,
+      "latency_ms": 19.78116703685373,
+      "passed": true
+    }
+  ],
+  "summary": {
+    "custom_passed": 6,
+    "langchain_passed": 6,
+    "total": 6,
+    "custom_average_latency_ms": 20.336367830168456,
+    "langchain_average_latency_ms": 22.46906267828308,
+    "custom_peak_python_memory_mb": 3.7231340408325195,
+    "langchain_peak_python_memory_mb": 9.404842376708984,
+    "custom_reference_loc": 590,
+    "langchain_reference_loc": 717,
+    "custom_retrieval_accuracy": 1.0,
+    "langchain_retrieval_accuracy": 1.0,
+    "custom_citation_validity": 1.0,
+    "langchain_citation_validity": 1.0
+  },
+  "methodology": {
+    "retrieval": "Real project PDF; custom relational vectors vs LangChain FAISS.",
+    "generation": "Deterministic local generation for reproducible correctness; the LangChain path still uses real LCEL and PydanticOutputParser.",
+    "memory": "Python allocations measured by tracemalloc; native model/FAISS memory excluded.",
+    "failure_behavior": {
+      "custom": "Support gate and post-processing downgrade unsupported output.",
+      "langchain": "Pydantic validation, bounded repair, and explicit not_found output."
+    }
+  }
+}
