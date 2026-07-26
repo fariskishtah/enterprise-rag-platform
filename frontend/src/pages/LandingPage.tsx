@@ -17,9 +17,12 @@ import { seedDemoWorkspace } from "../api/client";
 export function LandingPage() {
   const [seeding, setSeeding] = useState(false);
   const [seededNotice, setSeededNotice] = useState<string | null>(null);
+  const [seedError, setSeedError] = useState<string | null>(null);
 
   async function handleSeedDemo() {
     setSeeding(true);
+    setSeedError(null);
+    setSeededNotice(null);
     try {
       const res = await seedDemoWorkspace();
       setSeededNotice(res.message);
@@ -27,10 +30,11 @@ export function LandingPage() {
         window.location.href = `/chat?knowledgeBase=${res.knowledge_base_id}`;
       }, 1200);
     } catch (err) {
-      setSeededNotice("Failed to seed demo workspace. Proceeding to chat...");
-      setTimeout(() => {
-        window.location.href = "/chat";
-      }, 1000);
+      setSeedError(
+        err instanceof Error
+          ? err.message
+          : "The demo workspace could not be loaded. Please retry.",
+      );
     } finally {
       setSeeding(false);
     }
@@ -72,6 +76,7 @@ export function LandingPage() {
           </div>
 
           {seededNotice && <div className="notice success">{seededNotice}</div>}
+          {seedError && <div className="notice error">{seedError}</div>}
         </div>
       </header>
 

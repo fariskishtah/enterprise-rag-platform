@@ -94,6 +94,7 @@ export function ChatPage() {
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [asking, setAsking] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -191,18 +192,44 @@ export function ChatPage() {
   }
 
   async function clearConversation() {
-    if (sessionId) await deleteChatSession(sessionId);
-    setSessionId(null);
-    setMessages([]);
-    await loadSessions();
+    if (clearing) return;
+    setClearing(true);
+    setError(null);
+    try {
+      if (sessionId) await deleteChatSession(sessionId);
+      setSessionId(null);
+      setMessages([]);
+      await loadSessions();
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "Unable to clear the conversation.",
+      );
+    } finally {
+      setClearing(false);
+    }
+  }
+
+  async function copyAnswer(content: string) {
+    try {
+      if (!navigator.clipboard) throw new Error("Clipboard access is unavailable.");
+      await navigator.clipboard.writeText(content);
+    } catch {
+      setError("Unable to copy the answer. Select the text and copy it manually.");
+    }
   }
 
   if (!loading && knowledgeBases.length === 0) {
     return (
       <EmptyState
-        title="No knowledge base available"
-        description="Create a knowledge base and process a source before asking questions."
-        action={<a className="button primary" href="/knowledge-bases">Create knowledge base</a>}
+        title={error ? "Chat unavailable" : "No knowledge base available"}
+        description={
+          error ?? "Create a knowledge base and process a source before asking questions."
+        }
+        action={
+          error ? undefined : (
+            <a className="button primary" href="/knowledge-bases">Create knowledge base</a>
+          )
+        }
       />
     );
   }
@@ -277,8 +304,12 @@ export function ChatPage() {
             </button>
           ))}
           {messages.length > 0 && (
-            <button className="clear-thread" onClick={() => void clearConversation()}>
-              <Trash2 size={14} /> Clear thread
+            <button
+              className="clear-thread"
+              onClick={() => void clearConversation()}
+              disabled={clearing}
+            >
+              <Trash2 size={14} /> {clearing ? "Clearing…" : "Clear thread"}
             </button>
           )}
         </aside>
@@ -314,7 +345,9 @@ export function ChatPage() {
                     {message.role === "assistant" && (
                       <>
                         <div className="answer-toolbar">
-                          <button onClick={() => void navigator.clipboard.writeText(message.content)}>
+                          <button
+                            onClick={() => void copyAnswer(message.content)}
+                          >
                             <Copy size={14} /> Copy
                           </button>
                           <button onClick={() => setQuestion("Answer again more concisely.")}>

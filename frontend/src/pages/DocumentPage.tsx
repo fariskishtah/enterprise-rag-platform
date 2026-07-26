@@ -80,7 +80,14 @@ export function DocumentPage({ documentId }: { documentId: string }) {
             void load();
           }
         })
-        .catch(() => window.clearInterval(interval));
+        .catch((reason: unknown) => {
+          window.clearInterval(interval);
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : "Unable to refresh document processing status.",
+          );
+        });
     }, 1000);
     return () => window.clearInterval(interval);
   }, [document, load]);
@@ -122,6 +129,7 @@ export function DocumentPage({ documentId }: { documentId: string }) {
       );
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to delete the document.");
+    } finally {
       setActionLoading(false);
     }
   }

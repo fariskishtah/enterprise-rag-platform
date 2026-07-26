@@ -55,7 +55,7 @@ export default function App() {
   const mediaMatch = path.match(/^\/media\/([A-Za-z0-9-]+)$/);
   const workspaceMatch = path.match(/^\/knowledge-bases\/([A-Za-z0-9-]+)$/);
   const page =
-    path === "/" ? (
+    path === "/" || path === "/dashboard" || path === "/workspace" ? (
       <DashboardPage />
     ) : path === "/landing" ? (
       <LandingPage />
@@ -69,13 +69,13 @@ export default function App() {
       <LoginPage />
     ) : path === "/knowledge-bases" ? (
       <KnowledgeBasesPage />
-    ) : path === "/upload" ? (
+    ) : path === "/upload" || path === "/documents" ? (
       <UploadPage />
     ) : path === "/chat" ? (
       <ChatPage />
     ) : path === "/intelligence" ? (
       <IntelligencePage />
-    ) : path === "/video" ? (
+    ) : path === "/video" || path === "/media" ? (
       <VideoPage />
     ) : path === "/settings" ? (
       <SettingsPage />

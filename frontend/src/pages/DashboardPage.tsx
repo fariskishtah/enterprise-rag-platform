@@ -251,11 +251,17 @@ export function DashboardPage() {
           <dl className="health-details">
             <div>
               <dt>Retrieval</dt>
-              <dd>{configuration?.retrieval_strategy.replaceAll("_", " ") ?? "Loading"}</dd>
+              <dd>
+                {configuration?.retrieval_strategy.replaceAll("_", " ") ??
+                  (loading ? "Loading" : "Unavailable")}
+              </dd>
             </div>
             <div>
               <dt>Generator</dt>
-              <dd>{configuration?.generation_model.split("/").at(-1) ?? "Loading"}</dd>
+              <dd>
+                {configuration?.generation_model.split("/").at(-1) ??
+                  (loading ? "Loading" : "Unavailable")}
+              </dd>
             </div>
             <div>
               <dt>Runtime</dt>
@@ -268,7 +274,9 @@ export function DashboardPage() {
                           ? "cached"
                           : "on demand"
                     }`
-                  : "Loading"}
+                  : loading
+                    ? "Loading"
+                    : "Unavailable"}
               </dd>
             </div>
             <div>

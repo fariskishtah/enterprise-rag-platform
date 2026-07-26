@@ -23,7 +23,12 @@ import type {
   VideoIntelligence,
 } from "../types";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
+// A production bundle is served by FastAPI, so API traffic must stay on the
+// same origin. The override is intentionally development-only for Vite and the
+// deterministic browser-test server.
+const API_BASE_URL = import.meta.env.PROD
+  ? "/api/v1"
+  : (import.meta.env.VITE_API_BASE_URL ?? "/api/v1");
 
 /** Default timeout for normal API requests (ms). */
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -36,6 +41,7 @@ interface ErrorEnvelope {
     code?: string;
     message?: string;
   };
+  detail?: string;
 }
 
 export class ApiError extends Error {
@@ -49,46 +55,88 @@ export class ApiError extends Error {
   }
 }
 
+async function fetchWithTimeout(
+  path: string,
+  options?: RequestInit,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = window.setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+  const callerSignal = options?.signal;
+  const abortFromCaller = () => controller.abort(callerSignal?.reason);
+  if (callerSignal?.aborted) abortFromCaller();
+  else callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
+
+  const headers = new Headers(options?.headers);
+  const token = window.localStorage.getItem("token");
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  try {
+    return await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "name" in error &&
+      error.name === "AbortError"
+    ) {
+      throw new ApiError(
+        timedOut
+          ? "The request timed out. The service may be busy — please retry."
+          : "The request was canceled.",
+        0,
+        timedOut ? "request_timeout" : "request_aborted",
+      );
+    }
+    throw new ApiError(
+      "Unable to reach EnterpriseRAG. Check that the service is running and retry.",
+      0,
+      "network_error",
+    );
+  } finally {
+    window.clearTimeout(timer);
+    callerSignal?.removeEventListener("abort", abortFromCaller);
+  }
+}
+
+async function responseError(response: Response): Promise<ApiError> {
+  let payload: ErrorEnvelope = {};
+  try {
+    payload = (await response.json()) as ErrorEnvelope;
+  } catch {
+    // A proxy or network edge may return a non-JSON failure response.
+  }
+  return new ApiError(
+    payload.error?.message ?? payload.detail ?? "The request could not be completed.",
+    response.status,
+    payload.error?.code ?? "request_failed",
+  );
+}
+
 async function request<T>(
   path: string,
   options?: RequestInit,
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
 ): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const response = await fetchWithTimeout(path, options, timeoutMs);
+  if (!response.ok) throw await responseError(response);
+  return (await response.json()) as T;
+}
 
-  try {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-      ...options,
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      let payload: ErrorEnvelope = {};
-      try {
-        payload = (await response.json()) as ErrorEnvelope;
-      } catch {
-        // A proxy or network edge may return a non-JSON failure response.
-      }
-      throw new ApiError(
-        payload.error?.message ?? "The request could not be completed.",
-        response.status,
-        payload.error?.code ?? "request_failed",
-      );
-    }
-    return (await response.json()) as T;
-  } catch (error) {
-    if (error instanceof ApiError) throw error;
-    if (error instanceof DOMException && error.name === "AbortError") {
-      throw new ApiError(
-        "The request timed out. The model may be busy — please retry.",
-        0,
-        "request_timeout",
-      );
-    }
-    throw error;
-  } finally {
-    clearTimeout(timer);
-  }
+async function requestVoid(path: string, options?: RequestInit): Promise<void> {
+  const response = await fetchWithTimeout(path, options);
+  if (!response.ok) throw await responseError(response);
 }
 
 export function listKnowledgeBases(): Promise<KnowledgeBaseList> {
@@ -161,13 +209,7 @@ export function getDocumentChunks(
 }
 
 export function deleteDocument(documentId: string): Promise<void> {
-  return fetch(`${API_BASE_URL}/documents/${documentId}`, { method: "DELETE" }).then(
-    async (response) => {
-      if (!response.ok) {
-        throw new ApiError("Unable to delete the document.", response.status, "delete_failed");
-      }
-    },
-  );
+  return requestVoid(`/documents/${documentId}`, { method: "DELETE" });
 }
 
 export function askKnowledgeBase(input: {
@@ -208,17 +250,7 @@ export function getChatSession(sessionId: string): Promise<ChatSessionDetail> {
 }
 
 export function deleteChatSession(sessionId: string): Promise<void> {
-  return fetch(`${API_BASE_URL}/chat-sessions/${sessionId}`, {
-    method: "DELETE",
-  }).then(async (response) => {
-    if (!response.ok) {
-      throw new ApiError(
-        "Unable to clear the conversation.",
-        response.status,
-        "delete_failed",
-      );
-    }
-  });
+  return requestVoid(`/chat-sessions/${sessionId}`, { method: "DELETE" });
 }
 
 export function createSummary(input: {
@@ -521,4 +553,3 @@ export function loginUser(input: {
     body: JSON.stringify(input),
   });
 }
-

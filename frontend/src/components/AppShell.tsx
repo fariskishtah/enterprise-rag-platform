@@ -46,6 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [commandOpen, setCommandOpen] = useState(false);
   const [modelConfiguration, setModelConfiguration] =
     useState<RagConfiguration | null>(null);
+  const [modelConfigurationChecked, setModelConfigurationChecked] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     const saved = window.localStorage.getItem("enterprise-rag-theme");
     return saved === "dark" ? "dark" : "light";
@@ -65,6 +66,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         })
         .catch(() => {
           if (active) setModelConfiguration(null);
+        })
+        .finally(() => {
+          if (active) setModelConfigurationChecked(true);
         });
     };
     refresh();
@@ -195,12 +199,16 @@ export function AppShell({ children }: { children: ReactNode }) {
                   ? "Local models cached"
                   : modelConfiguration
                     ? "Models load on demand"
-                    : "Checking model cache"}
+                    : modelConfigurationChecked
+                      ? "Model status unavailable"
+                      : "Checking model cache"}
             </strong>
             <small>
               {modelConfiguration
                 ? `${modelConfiguration.model_device.toUpperCase()} · private`
-                : "Private · no external API"}
+                : modelConfigurationChecked
+                  ? "Retrying · private"
+                  : "Private · no external API"}
             </small>
           </span>
         </div>

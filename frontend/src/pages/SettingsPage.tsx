@@ -5,14 +5,28 @@ import type { RagConfiguration } from "../types";
 
 export function SettingsPage() {
   const [configuration, setConfiguration] = useState<RagConfiguration | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
     getRagConfiguration()
-      .then(setConfiguration)
-      .catch((reason: unknown) =>
-        setError(reason instanceof Error ? reason.message : "Unable to load model settings."),
-      );
+      .then((value) => {
+        if (active) setConfiguration(value);
+      })
+      .catch((reason: unknown) => {
+        if (active) {
+          setError(
+            reason instanceof Error ? reason.message : "Unable to load model settings.",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const values = configuration
@@ -63,9 +77,9 @@ export function SettingsPage() {
         so vectors cannot become stale.
       </div>
 
-      {!configuration ? (
+      {loading ? (
         <div className="panel loading-state">Loading configuration…</div>
-      ) : (
+      ) : configuration ? (
         <article className="panel settings-panel">
           <dl className="settings-list">
             {values.map(([label, value]) => (
@@ -76,6 +90,11 @@ export function SettingsPage() {
             ))}
           </dl>
         </article>
+      ) : (
+        <div className="panel empty-state">
+          <h2>Configuration unavailable</h2>
+          <p>Verify the backend is running, then refresh this page to try again.</p>
+        </div>
       )}
     </section>
   );

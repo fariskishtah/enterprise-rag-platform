@@ -109,6 +109,7 @@ export function VideoPage({ mediaId: routeMediaId }: VideoPageProps) {
     if (!selectedId) return;
     let active = true;
     let timeout: number | undefined;
+    let pollAttempts = 0;
     async function loadSelection() {
       try {
         const detail = await getMedia(selectedId);
@@ -124,6 +125,13 @@ export function VideoPage({ mediaId: routeMediaId }: VideoPageProps) {
             setIntelligence(nextIntelligence);
           }
         } else if (detail.status !== "failed") {
+          pollAttempts += 1;
+          if (pollAttempts >= 120) {
+            setError(
+              "Media processing is taking longer than expected. Refresh later to check its status.",
+            );
+            return;
+          }
           timeout = window.setTimeout(() => void loadSelection(), 1500);
         }
       } catch (reason) {
@@ -236,9 +244,15 @@ export function VideoPage({ mediaId: routeMediaId }: VideoPageProps) {
   if (!loading && knowledgeBases.length === 0) {
     return (
       <EmptyState
-        title="No video workspace yet"
-        description="Create a knowledge base, then add an audio file, video, or public link."
-        action={<a className="button primary" href="/upload">Add a video source</a>}
+        title={error ? "Video workspace unavailable" : "No video workspace yet"}
+        description={
+          error ?? "Create a knowledge base, then add an audio file, video, or public link."
+        }
+        action={
+          error ? undefined : (
+            <a className="button primary" href="/upload">Add a video source</a>
+          )
+        }
       />
     );
   }

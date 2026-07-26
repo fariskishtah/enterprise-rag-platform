@@ -2,6 +2,7 @@
 
 import hashlib
 import math
+import os
 import shutil
 import struct
 import wave
@@ -97,6 +98,7 @@ def main() -> None:
     if runtime.is_dir():
         shutil.rmtree(runtime)
     runtime.mkdir(parents=True)
+    frontend_port = os.getenv("PLAYWRIGHT_DEV_PORT", "5173")
     settings = Settings(
         environment="test",
         database_url=f"sqlite:///{runtime / 'playwright.db'}",
@@ -104,7 +106,7 @@ def main() -> None:
         model_cache_path=backend_root / "data" / "models",
         max_upload_bytes=2 * 1024 * 1024,
         max_media_upload_bytes=10 * 1024 * 1024,
-        cors_origins=["http://127.0.0.1:5173"],
+        cors_origins=[f"http://127.0.0.1:{frontend_port}"],
         chunk_size=220,
         chunk_overlap=36,
         similarity_threshold=0,

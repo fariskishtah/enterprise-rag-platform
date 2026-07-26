@@ -75,6 +75,7 @@ export function UploadPage() {
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -146,8 +147,14 @@ export function UploadPage() {
         ...value,
         [document.id]: current.status_message ?? current.status,
       }));
-      if (current.status === "ready_for_chat" || current.status === "failed") return;
+      if (current.status === "ready_for_chat") return;
+      if (current.status === "failed") {
+        throw new Error(current.status_message ?? "Document processing failed.");
+      }
     }
+    throw new Error(
+      "Document processing timed out. It may still be running; refresh the source library to check its status.",
+    );
   }
 
   async function waitForMedia(source: MediaSource) {
@@ -158,8 +165,14 @@ export function UploadPage() {
         ...value,
         [source.id]: current.status_message ?? current.status,
       }));
-      if (current.status === "ready" || current.status === "failed") return;
+      if (current.status === "ready") return;
+      if (current.status === "failed") {
+        throw new Error(current.status_message ?? "Media processing failed.");
+      }
     }
+    throw new Error(
+      "Media processing timed out. It may still be running; refresh the source library to check its status.",
+    );
   }
 
   async function submitFiles(event: FormEvent<HTMLFormElement>) {
@@ -214,6 +227,24 @@ export function UploadPage() {
     }
   }
 
+  async function retrySource(sourceId: string, isMedia: boolean) {
+    if (retryingIds.has(sourceId)) return;
+    setRetryingIds((current) => new Set(current).add(sourceId));
+    setError(null);
+    try {
+      await (isMedia ? retryMedia(sourceId) : retryDocument(sourceId));
+      await loadSources();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to retry the source.");
+    } finally {
+      setRetryingIds((current) => {
+        const next = new Set(current);
+        next.delete(sourceId);
+        return next;
+      });
+    }
+  }
+
   const library = useMemo(() => {
     const sourceValues = [
       ...documents.map((value) => ({ kind: "document" as const, value })),
@@ -244,9 +275,16 @@ export function UploadPage() {
   if (!loading && knowledgeBases.length === 0) {
     return (
       <EmptyState
-        title="Create a knowledge base first"
-        description="Every document, recording, and video belongs to an explicit knowledge scope."
-        action={<a className="button primary" href="/knowledge-bases">Create knowledge base</a>}
+        title={error ? "Source library unavailable" : "Create a knowledge base first"}
+        description={
+          error ??
+          "Every document, recording, and video belongs to an explicit knowledge scope."
+        }
+        action={
+          error ? undefined : (
+            <a className="button primary" href="/knowledge-bases">Create knowledge base</a>
+          )
+        }
       />
     );
   }
@@ -491,11 +529,10 @@ export function UploadPage() {
                   </a>
                   {!ready && value.status === "failed" && (
                     <button
-                      onClick={() =>
-                        void (isMedia ? retryMedia(value.id) : retryDocument(value.id)).then(loadSources)
-                      }
+                      onClick={() => void retrySource(value.id, isMedia)}
+                      disabled={retryingIds.has(value.id)}
                     >
-                      Retry
+                      {retryingIds.has(value.id) ? "Retrying…" : "Retry"}
                     </button>
                   )}
                 </div>

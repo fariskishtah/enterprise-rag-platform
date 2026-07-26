@@ -31,12 +31,12 @@ export function LoginPage() {
         window.location.href = "/";
       }
     } catch (err) {
-      // Fallback for local development demo
-      localStorage.setItem("token", "dev-local-token");
-      setNotice("Local dev fallback mode: access granted.");
-      setTimeout(() => {
-        window.location.href = "/";
-      }, 800);
+      localStorage.removeItem("token");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Authentication failed. Check your credentials and retry.",
+      );
     } finally {
       setLoading(false);
     }
@@ -96,7 +96,15 @@ export function LoginPage() {
         </form>
 
         <div className="auth-footer">
-          <button className="text-button" onClick={() => setIsRegister(!isRegister)}>
+          <button
+            type="button"
+            className="text-button"
+            onClick={() => {
+              setIsRegister(!isRegister);
+              setError(null);
+              setNotice(null);
+            }}
+          >
             {isRegister ? "Already have an account? Sign in" : "Need an account? Register here"}
           </button>
         </div>

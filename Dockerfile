@@ -27,8 +27,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /workspace
 
 # Install Python backend
-COPY backend/pyproject.toml backend/README.md /workspace/backend/
+COPY backend/pyproject.toml /workspace/backend/
 COPY backend/app /workspace/backend/app
+# The production image runs on CPU. Installing torch from the default PyPI
+# index pulls the full CUDA runtime on Linux, even for CPU-only hosts.
+ARG PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir 'torch>=2.7,<3.0' --index-url "${PYTORCH_INDEX_URL}"
 RUN pip install --no-cache-dir -e '/workspace/backend[dev,media]'
 
 # Copy frontend static build artifacts into backend static directory
