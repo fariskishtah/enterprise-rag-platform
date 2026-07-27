@@ -76,6 +76,15 @@ class DocumentProcessingService:
                 "Extracting text and source structure.",
             )
             extracted = self.extractors.extract(path, document.document_type)
+            if (
+                extracted.page_count is not None
+                and extracted.page_count > self.settings.max_document_pages
+            ):
+                raise ProcessingError(
+                    "The document exceeds the public-demo page limit. "
+                    "Upload a shorter document or split it into smaller files.",
+                    code="document_page_limit_exceeded",
+                )
             self._persist_extraction(document, extracted)
 
             self._set_status(

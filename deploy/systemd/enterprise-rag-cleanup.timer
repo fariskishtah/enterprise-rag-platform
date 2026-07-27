@@ -1,0 +1,11 @@
+[Unit]
+Description=Run EnterpriseRAG demo cleanup hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=10m
+Unit=enterprise-rag-cleanup.service
+
+[Install]
+WantedBy=timers.target

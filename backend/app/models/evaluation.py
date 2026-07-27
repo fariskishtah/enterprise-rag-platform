@@ -8,6 +8,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
+MAX_EVALUATION_CASES_PER_DATASET = 25
+
 
 def generate_uuid() -> str:
     return str(uuid4())

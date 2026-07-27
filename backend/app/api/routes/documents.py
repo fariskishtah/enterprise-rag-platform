@@ -17,8 +17,10 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import (
     get_db_session,
     get_file_storage,
+    get_runtime_settings,
 )
-from app.core.errors import ConflictError, NotFoundError
+from app.core.config import Settings
+from app.core.errors import ConflictError, GenerationQueueFullError, NotFoundError
 from app.db.session import session_scope
 from app.models.document import DocumentStatus
 from app.repositories.documents import DocumentRepository
@@ -49,20 +51,53 @@ ACTIVE_PROCESSING_STATUSES = {
 }
 
 
-def run_document_processing(app: FastAPI, document_id: str) -> None:
-    session_factory = app.state.session_factory
-    with session_scope(session_factory) as session:
-        DocumentProcessingService(
-            session=session,
-            storage=app.state.file_storage,
-            settings=app.state.settings,
-            embedding_provider=app.state.embedding_provider,
-            langchain_pipeline=(
-                app.state.langchain_runtime.document_pipeline
-                if app.state.langchain_runtime is not None
-                else None
-            ),
-        ).process(document_id)
+def _mark_document_busy(app: FastAPI, document_id: str, message: str) -> None:
+    with session_scope(app.state.session_factory) as session:
+        document = DocumentRepository(session).get(document_id)
+        if document is None:
+            return
+        document.status = DocumentStatus.FAILED
+        document.status_message = message
+        document.processing_error = message
+        session.add(document)
+        session.commit()
+
+
+async def run_document_processing(app: FastAPI, document_id: str) -> None:
+    settings = app.state.settings
+    queue = app.state.generation_queue
+    try:
+        slot = await queue.acquire(timeout=settings.generation_queue_timeout_seconds)
+    except (TimeoutError, GenerationQueueFullError):
+        _mark_document_busy(
+            app,
+            document_id,
+            "The server is busy with another AI task. Retry this document shortly.",
+        )
+        return
+
+    def process() -> None:
+        with session_scope(app.state.session_factory) as session:
+            DocumentProcessingService(
+                session=session,
+                storage=app.state.file_storage,
+                settings=settings,
+                embedding_provider=app.state.embedding_provider,
+                langchain_pipeline=(
+                    app.state.langchain_runtime.document_pipeline
+                    if app.state.langchain_runtime is not None
+                    else None
+                ),
+            ).process(document_id)
+
+    try:
+        await queue.execute(slot, process, timeout=settings.media_processing_timeout_seconds)
+    except TimeoutError:
+        _mark_document_busy(
+            app,
+            document_id,
+            "Document processing exceeded the safe time limit. Split the file and retry.",
+        )
 
 
 @router.post(
@@ -75,8 +110,11 @@ async def upload_document(
     file: Annotated[UploadFile, File()],
     session: Annotated[Session, Depends(get_db_session)],
     storage: Annotated[LocalFileStorage, Depends(get_file_storage)],
+    settings: Annotated[Settings, Depends(get_runtime_settings)],
 ) -> DocumentRead:
-    document = await DocumentService(session, storage).upload(knowledge_base_id, file)
+    document = await DocumentService(session, storage, settings=settings).upload(
+        knowledge_base_id, file
+    )
     return DocumentRead.model_validate(document)
 
 

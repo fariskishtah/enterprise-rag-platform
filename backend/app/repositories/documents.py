@@ -2,6 +2,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models.document import Document, DocumentChunk, DocumentSection
+from app.services.lifecycle import mark_accessed
 
 
 class DocumentRepository:
@@ -15,7 +16,11 @@ class DocumentRepository:
         return document
 
     def get(self, document_id: str) -> Document | None:
-        return self.session.get(Document, document_id)
+        value = self.session.get(Document, document_id)
+        if value is not None:
+            mark_accessed(value)
+            self.session.commit()
+        return value
 
     def find_by_checksum(self, knowledge_base_id: str, checksum_sha256: str) -> Document | None:
         statement = select(Document).where(
@@ -30,7 +35,12 @@ class DocumentRepository:
             .where(Document.knowledge_base_id == knowledge_base_id)
             .order_by(Document.created_at.desc())
         )
-        return list(self.session.scalars(statement).all())
+        values = list(self.session.scalars(statement).all())
+        for value in values:
+            mark_accessed(value)
+        if values:
+            self.session.commit()
+        return values
 
     def replace_extraction(
         self,

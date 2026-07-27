@@ -18,16 +18,23 @@ from fastapi import (
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from app.ai.generation_queue import GenerationQueue
 from app.ai.interfaces import EmbeddingProvider, GenerationProvider
 from app.api.dependencies import (
     get_db_session,
     get_embedding_provider,
     get_file_storage,
     get_generation_provider,
+    get_generation_queue,
     get_runtime_settings,
 )
 from app.core.config import Settings
-from app.core.errors import ConflictError, NotFoundError
+from app.core.errors import (
+    ConflictError,
+    GenerationQueueFullError,
+    GenerationTimeoutError,
+    NotFoundError,
+)
 from app.db.session import session_scope
 from app.models.media import MediaProcessingStatus, MediaSource
 from app.repositories.knowledge_bases import KnowledgeBaseRepository
@@ -69,23 +76,61 @@ ACTIVE_MEDIA_STATUSES = {
 }
 
 
-def run_media_processing(
+def _mark_media_busy(request: Request, media_source_id: str, code: str, message: str) -> None:
+    with session_scope(request.app.state.session_factory) as session:
+        source = MediaRepository(session).get(media_source_id)
+        if source is None:
+            return
+        source.status = MediaProcessingStatus.FAILED
+        source.status_message = message
+        source.safe_error_message = message
+        source.error_code = code
+        source.retryable = True
+        session.add(source)
+        session.commit()
+
+
+async def run_media_processing(
     request: Request,
     media_source_id: str,
     forced_language: str | None,
     output_language: str = "auto",
 ) -> None:
-    with session_scope(request.app.state.session_factory) as session:
-        MediaProcessingService(
-            session=session,
-            storage=request.app.state.file_storage,
-            settings=request.app.state.settings,
-            embedding_provider=request.app.state.embedding_provider,
-            transcription_provider=request.app.state.transcription_provider,
-        ).process(
+    queue = request.app.state.generation_queue
+    settings = request.app.state.settings
+    try:
+        slot = await queue.acquire(timeout=settings.generation_queue_timeout_seconds)
+    except (TimeoutError, GenerationQueueFullError):
+        _mark_media_busy(
+            request,
             media_source_id,
-            forced_language=forced_language,
-            output_language=output_language,
+            "server_busy",
+            "The server is busy with another AI task. Retry this media job shortly.",
+        )
+        return
+
+    def process() -> None:
+        with session_scope(request.app.state.session_factory) as session:
+            MediaProcessingService(
+                session=session,
+                storage=request.app.state.file_storage,
+                settings=settings,
+                embedding_provider=request.app.state.embedding_provider,
+                transcription_provider=request.app.state.transcription_provider,
+            ).process(
+                media_source_id,
+                forced_language=forced_language,
+                output_language=output_language,
+            )
+
+    try:
+        await queue.execute(slot, process, timeout=settings.media_processing_timeout_seconds)
+    except TimeoutError:
+        _mark_media_busy(
+            request,
+            media_source_id,
+            "media_processing_timeout",
+            "Media processing exceeded the safe time limit. Try a shorter file.",
         )
 
 
@@ -378,13 +423,14 @@ def media_intelligence(
 
 
 @router.post("/media/{media_source_id}/ask", response_model=RagAnswerRead)
-def ask_media(
+async def ask_media(
     media_source_id: str,
     payload: RagAskRequest,
     session: Annotated[Session, Depends(get_db_session)],
     settings: Annotated[Settings, Depends(get_runtime_settings)],
     embedding_provider: Annotated[EmbeddingProvider, Depends(get_embedding_provider)],
     generation_provider: Annotated[GenerationProvider, Depends(get_generation_provider)],
+    generation_queue: Annotated[GenerationQueue, Depends(get_generation_queue)],
 ) -> RagAnswerRead:
     source = _get_source(session, media_source_id)
     if not source.transcript_document_id:
@@ -393,12 +439,27 @@ def ask_media(
             message="The transcript is not indexed yet.",
         )
     scoped = payload.model_copy(update={"source_document_ids": [source.transcript_document_id]})
-    return RagService(
-        session=session,
-        settings=settings,
-        embedding_provider=embedding_provider,
-        generation_provider=generation_provider,
-    ).ask(source.knowledge_base_id, scoped)
+    try:
+        slot = await generation_queue.acquire(timeout=settings.generation_queue_timeout_seconds)
+    except TimeoutError as exc:
+        raise GenerationQueueFullError(
+            "The server is busy with another model request. Please retry shortly."
+        ) from exc
+    try:
+        return await generation_queue.execute(
+            slot,
+            lambda: RagService(
+                session=session,
+                settings=settings,
+                embedding_provider=embedding_provider,
+                generation_provider=generation_provider,
+            ).ask(source.knowledge_base_id, scoped),
+            timeout=settings.generation_timeout_seconds,
+        )
+    except TimeoutError as exc:
+        raise GenerationTimeoutError(
+            "The media answer could not be generated in time. Please retry."
+        ) from exc
 
 
 @router.get("/media/{media_source_id}/export/{export_kind}")

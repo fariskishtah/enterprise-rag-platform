@@ -1,0 +1,20 @@
+[Unit]
+Description=EnterpriseRAG AWS Compose application
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=ubuntu
+Group=docker
+WorkingDirectory=/home/ubuntu/EnterpriseRAG
+Environment=ENTERPRISE_RAG_BACKUP_DIR=/home/ubuntu/enterprise-rag-backups
+ExecStart=/usr/bin/docker compose -f docker-compose.aws.yml up -d app
+ExecStop=/usr/bin/docker compose -f docker-compose.aws.yml stop --timeout 90 app
+TimeoutStartSec=0
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target

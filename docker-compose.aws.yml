@@ -1,0 +1,47 @@
+services:
+  app:
+    build:
+      context: .
+    image: enterprise-rag:${ENTERPRISE_RAG_IMAGE_TAG:-latest}
+    container_name: enterprise-rag
+    init: true
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ENTERPRISE_RAG_BACKUP_DIR: /backups
+      ENTERPRISE_RAG_GIT_COMMIT: ${ENTERPRISE_RAG_GIT_COMMIT:-unknown}
+      HF_HOME: /models/huggingface
+      PYTHONDONTWRITEBYTECODE: "1"
+    ports:
+      - "127.0.0.1:7860:7860"
+    volumes:
+      - enterprise-rag-data:/data
+      - enterprise-rag-model-cache:/models/huggingface
+      - /home/ubuntu/youtube-cookies.txt:/run/secrets/youtube-cookies.txt:ro
+      - ${ENTERPRISE_RAG_BACKUP_DIR:-/home/ubuntu/enterprise-rag-backups}:/backups
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:7860/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    stop_grace_period: 90s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 3200m
+    cpus: 2.0
+    pids_limit: 512
+
+volumes:
+  enterprise-rag-data:
+    name: enterprise-rag-data
+  enterprise-rag-model-cache:
+    name: enterprise-rag-model-cache

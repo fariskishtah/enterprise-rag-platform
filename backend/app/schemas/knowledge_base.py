@@ -17,6 +17,9 @@ class KnowledgeBaseRead(BaseModel):
     document_count: int
     created_at: datetime
     updated_at: datetime
+    last_accessed_at: datetime
+    expires_at: datetime | None
+    is_protected: bool
 
 
 class KnowledgeBaseList(BaseModel):

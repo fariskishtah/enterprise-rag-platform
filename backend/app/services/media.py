@@ -4,7 +4,6 @@ import hashlib
 import json
 import mimetypes
 import os
-import re
 import shutil
 import subprocess
 import tempfile
@@ -16,6 +15,7 @@ from urllib.parse import urljoin
 
 import httpx
 from fastapi import UploadFile
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.ai.interfaces import EmbeddingProvider
@@ -31,7 +31,13 @@ from app.media.transcription import (
     stable_segment_id,
     subtitle_segments,
 )
-from app.media.validation import is_youtube_url, validate_media_filename, validate_public_url
+from app.media.validation import (
+    is_youtube_url,
+    validate_declared_media_type,
+    validate_media_content,
+    validate_media_filename,
+    validate_public_url,
+)
 from app.models.document import (
     Document,
     DocumentChunk,
@@ -54,6 +60,7 @@ from app.repositories.documents import DocumentRepository
 from app.repositories.knowledge_bases import KnowledgeBaseRepository
 from app.repositories.media import MediaRepository
 from app.services.language import resolve_output_language, transcription_language
+from app.services.lifecycle import demo_expiry
 from app.services.storage import LocalFileStorage
 
 STAGE_NUMBER = {
@@ -273,12 +280,19 @@ class MediaIngestionService:
 
     async def upload(self, knowledge_base_id: str, upload: UploadFile) -> MediaSource:
         self._require_knowledge_base(knowledge_base_id)
-        original_name = Path(upload.filename or "").name
+        original_name = Path(upload.filename or "").name.strip()
         if not original_name:
             raise UploadValidationError(
                 code="missing_filename", message="The uploaded media must have a filename."
             )
         extension, media_type = validate_media_filename(original_name)
+        validate_declared_media_type(upload.content_type, extension)
+        if len(original_name) > 255 or any(ord(character) < 32 for character in original_name):
+            raise UploadValidationError(
+                code="unsafe_filename",
+                message="The uploaded filename contains unsafe characters.",
+            )
+        self._require_file_capacity(knowledge_base_id)
         media_id = str(uuid.uuid4())
         relative_key = Path(knowledge_base_id) / "media" / f"{media_id}{extension}"
         destination = self.storage.root / relative_key
@@ -305,6 +319,7 @@ class MediaIngestionService:
                 raise UploadValidationError(
                     code="empty_media", message="The uploaded media is empty."
                 )
+            validate_media_content(temporary, extension)
             os.replace(temporary, destination)
         except Exception:
             temporary.unlink(missing_ok=True)
@@ -333,11 +348,34 @@ class MediaIngestionService:
             title=Path(original_name).stem,
             status=MediaProcessingStatus.UPLOADED_OR_LINKED,
             status_message="Stored securely and queued for validation.",
+            expires_at=demo_expiry(self.settings.demo_data_retention_hours),
         )
         return self.media.add(source)
 
+    def _require_file_capacity(self, knowledge_base_id: str) -> None:
+        document_count = self.session.scalar(
+            select(func.count(Document.id)).where(
+                Document.knowledge_base_id == knowledge_base_id,
+                ~Document.storage_key.contains("/transcripts/"),
+            )
+        ) or 0
+        media_count = self.session.scalar(
+            select(func.count(MediaSource.id)).where(
+                MediaSource.knowledge_base_id == knowledge_base_id
+            )
+        ) or 0
+        if document_count + media_count >= self.settings.max_files_per_knowledge_base:
+            raise UploadValidationError(
+                code="knowledge_base_file_quota_exceeded",
+                message=(
+                    "This knowledge base has reached the public-demo file limit. "
+                    "Remove a source before uploading another."
+                ),
+            )
+
     def create_url(self, knowledge_base_id: str, url: str, title: str | None = None) -> MediaSource:
         self._require_knowledge_base(knowledge_base_id)
+        self._require_file_capacity(knowledge_base_id)
         safe_url = validate_public_url(url)
         duplicate = self.media.find_by_url(knowledge_base_id, safe_url)
         if duplicate is not None:
@@ -354,6 +392,7 @@ class MediaIngestionService:
             title=title or ("YouTube video" if youtube else "Linked media"),
             status=MediaProcessingStatus.UPLOADED_OR_LINKED,
             status_message="Linked and queued for safe metadata retrieval.",
+            expires_at=demo_expiry(self.settings.demo_data_retention_hours),
         )
         return self.media.add(source)
 
@@ -548,6 +587,10 @@ class MediaProcessingService:
             return source
         finally:
             shutil.rmtree(temporary_directory, ignore_errors=True)
+            if self.settings.unload_transcription_model_after_use:
+                unload = getattr(self.transcription_provider, "unload", None)
+                if callable(unload):
+                    unload()
 
     def _resolve_source(
         self,
@@ -863,6 +906,8 @@ class MediaProcessingService:
                 storage_key=relative_key.as_posix(),
                 status=DocumentStatus.CHUNKING,
                 status_message="Building timestamp-aware transcript chunks.",
+                expires_at=source.expires_at,
+                is_protected=source.is_protected,
             )
             self.session.add(document)
             self.session.flush()
@@ -1186,9 +1231,9 @@ class MediaProcessingService:
                 code=error_code,
             ) from exc
         if completed.returncode != 0 and not allow_failure:
-            safe_detail = re.sub(r"https?://\S+", "[redacted-url]", completed.stderr)
             raise ProcessingError(
-                f"The media source could not be processed: {safe_detail[-300:]}",
+                "The media file could not be decoded by the local media tools. "
+                "Confirm that it has a supported audio or video stream and retry.",
                 code=error_code,
             )
         return completed

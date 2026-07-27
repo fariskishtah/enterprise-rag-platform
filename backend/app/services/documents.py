@@ -1,15 +1,23 @@
 import uuid
-from pathlib import Path
 from typing import Any
 
 from fastapi import UploadFile
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import Settings
 from app.core.errors import ConflictError, NotFoundError, UploadValidationError
-from app.document_processing.validation import CANONICAL_MEDIA_TYPES, document_type_for_filename
+from app.document_processing.validation import (
+    CANONICAL_MEDIA_TYPES,
+    document_type_for_filename,
+    safe_display_filename,
+    validate_declared_media_type,
+)
 from app.models.document import Document, DocumentStatus
+from app.models.media import MediaSource
 from app.repositories.documents import DocumentRepository
 from app.repositories.knowledge_bases import KnowledgeBaseRepository
+from app.services.lifecycle import demo_expiry
 from app.services.storage import LocalFileStorage
 
 
@@ -19,6 +27,7 @@ class DocumentService:
         session: Session,
         storage: LocalFileStorage,
         *,
+        settings: Settings | None = None,
         langchain_pipeline: Any | None = None,
     ) -> None:
         self.session = session
@@ -26,18 +35,37 @@ class DocumentService:
         self.documents = DocumentRepository(session)
         self.knowledge_bases = KnowledgeBaseRepository(session)
         self.langchain_pipeline = langchain_pipeline
+        self.settings = settings
 
     async def upload(self, knowledge_base_id: str, upload: UploadFile) -> Document:
         if self.knowledge_bases.get(knowledge_base_id) is None:
             raise NotFoundError("Knowledge base")
-
-        original_name = Path(upload.filename or "").name
-        if not original_name:
+        if self.settings is None:
+            raise RuntimeError("Document uploads require runtime settings.")
+        document_count = self.session.scalar(
+            select(func.count(Document.id)).where(
+                Document.knowledge_base_id == knowledge_base_id,
+                ~Document.storage_key.contains("/transcripts/"),
+            )
+        ) or 0
+        media_count = self.session.scalar(
+            select(func.count(MediaSource.id)).where(
+                MediaSource.knowledge_base_id == knowledge_base_id
+            )
+        ) or 0
+        if document_count + media_count >= self.settings.max_files_per_knowledge_base:
             raise UploadValidationError(
-                code="missing_filename", message="The uploaded document must have a filename."
+                code="knowledge_base_file_quota_exceeded",
+                message=(
+                    "This knowledge base has reached the public-demo file limit. "
+                    "Remove a source before uploading another."
+                ),
             )
 
+        original_name = safe_display_filename(upload.filename or "")
+
         document_type = document_type_for_filename(original_name)
+        validate_declared_media_type(upload.content_type, document_type)
         document_id = str(uuid.uuid4())
         stored = await self.storage.save(
             upload=upload,
@@ -67,6 +95,7 @@ class DocumentService:
             storage_key=stored.storage_key,
             status=DocumentStatus.UPLOADED,
             status_message="Stored and ready for processing.",
+            expires_at=demo_expiry(self.settings.demo_data_retention_hours),
         )
         try:
             return self.documents.add(document)

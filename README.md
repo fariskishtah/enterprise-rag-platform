@@ -1,404 +1,262 @@
-# EnterpriseRAG: Multimodal Knowledge Intelligence & Grounded AI Platform
+# EnterpriseRAG
 
-[![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![React](https://img.shields.io/badge/React-19-61DAFB.svg?logo=react&logoColor=black)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![LangChain](https://img.shields.io/badge/LangChain-0.3-1C3C3C.svg?logo=chainlink&logoColor=white)](https://www.langchain.com/)
-[![Hugging Face](https://img.shields.io/badge/Hugging%20Face-Transformers-FFD21E.svg?logo=huggingface&logoColor=black)](https://huggingface.co/)
-[![FAISS](https://img.shields.io/badge/FAISS-CPU-00599C.svg?logo=meta&logoColor=white)](https://github.com/facebookresearch/faiss)
-[![Whisper](https://img.shields.io/badge/Whisper-Faster--Whisper-000000.svg?logo=openai&logoColor=white)](https://github.com/SYSTRAN/faster-whisper)
-[![Pytest](https://img.shields.io/badge/Pytest-Automated-0A9EDC.svg?logo=pytest&logoColor=white)](https://docs.pytest.org/)
-[![Playwright](https://img.shields.io/badge/Playwright-E2E-2EAD33.svg?logo=playwright&logoColor=white)](https://playwright.dev/)
-[![Ruff](https://img.shields.io/badge/Ruff-Linter-D7FF64.svg?logo=python&logoColor=black)](https://docs.astral.sh/ruff/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)](https://www.docker.com/)
+EnterpriseRAG is a local-first, multilingual retrieval-augmented generation platform for
+grounded questions, citations, document intelligence, and audio/video transcription. It
+combines a React + TypeScript workspace with FastAPI, SQLite, Hugging Face models, a custom
+hybrid retriever, an optional LangChain/LCEL path, and a CPU-safe media pipeline.
 
-> **EnterpriseRAG** is an end-to-end multimodal knowledge intelligence platform for grounded question answering, deep analysis, and evidence retrieval across documents, scanned PDFs, structured tables, audio, video, and public media sources.
+> Public demo URL: **add the production HTTPS URL after DNS and certificate validation**.
+>
+> Public demo warning: do not upload confidential, personal, regulated, or sensitive
+> information. Demo files may be deleted automatically. AI output may contain errors;
+> inspect the cited sources. YouTube import is best-effort, while direct MP3/MP4 upload is
+> the supported reliable media path.
 
-![EnterpriseRAG Hero Dashboard](artifacts/hero-dashboard.png)
+## Screenshots
 
----
+Add current release screenshots after the production browser checklist passes:
 
-## Navigation & Architecture Links
-- [Hugging Face Space Demo](https://huggingface.co/spaces/fariskishtah/enterprise-rag-platform) *(Deployable Docker Space)*
-- [System Architecture](docs/architecture/overview.md) *(High-level & pipeline diagrams)*
-- [Engineering Case Study](docs/case-study.md) *(Deep dive into technical design & optimizations)*
-- [Demo Video Package](docs/demo-video/demo-script.md) *(2-minute recruiter video script)*
-- [Evaluation System](docs/architecture/evaluation-system.md) *(Deterministic & benchmark evaluation)*
-- [Hugging Face Space Deployment Guide](docs/huggingface-spaces.md) *(Single-container Docker guide)*
-- [AWS Lightsail CPU Deployment](docs/aws-cpu-deployment.md) *(2 vCPU / 4 GB profile, cookies, and benchmarks)*
+- Landing page — desktop, 1440 × 1000
+- Landing page — mobile, 390 × 844
+- Arabic grounded answer with citation — 1440 × 1000
+- Direct media transcript and timestamp citation — 1440 × 1000
+- Operations/settings limits — 1440 × 1000
 
----
+Existing measured development artifacts are under [`artifacts/`](artifacts/); no screenshot
+in this section should be treated as current until manually reviewed.
 
-## 1. Hero
+## Capabilities
 
-EnterpriseRAG eliminates hallucination risks by verifying every AI-generated claim against passage-level citations, providing exact page numbers, section headers, audio timestamps, and source video playback. Designed for enterprise deployment, it runs 100% locally or in containerized environments with zero dependency on paid cloud APIs (OpenAI/Anthropic).
+- PDF, DOCX, and UTF-8 text ingestion with validation, extraction, OCR fallback, chunking,
+  embeddings, and citations.
+- Direct MP3, WAV, M4A, MP4, MOV, MKV, and WebM upload with duration validation,
+  faster-whisper transcription, timestamps, transcript search, and media intelligence.
+- Arabic and English retrieval, question answering, summaries, transcription, and RTL
+  rendering for Arabic content.
+- Grounded answers with passage, page, section, or timestamp citations and explicit
+  insufficient-evidence behavior.
+- Custom hybrid retrieval and an optional LangChain/LCEL + FAISS course-compatibility path.
+- Summary, comparison, report, evaluation, feedback, and reusable template workflows.
+- Public-demo access mode with bcrypt verification, signed HttpOnly sessions, temporary
+  lockout, rate limits, quotas, retention cleanup, and protected operational status.
+- CPU/RAM protection through one bounded heavy-operation gate shared by generation,
+  intelligence, warm-up, and transcription.
 
----
+## Supported source types and default public limits
 
-## 2. Product Overview
+| Category | Supported types | AWS public-demo default |
+| --- | --- | ---: |
+| Documents | PDF, DOCX, TXT (UTF-8) | 50 MB, 300 pages |
+| Audio | MP3, WAV, M4A | 50 MB, 30 minutes |
+| Video | MP4, MOV, MKV, WebM | 50 MB, 30 minutes |
+| Knowledge bases | Shared demo workspace | 5 total |
+| Files | Documents and media | 25 per knowledge base |
+| Heavy AI work | Qwen, reports, Whisper, media processing | 1 active, 2 queued |
+| Demo retention | KBs, documents, and media | 24 hours |
 
-EnterpriseRAG transforms unstructured corporate knowledge—PDFs, DOCX files, scanned contracts, financial tables, meeting recordings, lectures, and YouTube videos—into grounded intelligence. 
+Every limit is configurable with an `ENTERPRISE_RAG_` environment variable. See
+[`.env.aws-cpu.example`](.env.aws-cpu.example).
 
-Key pillars:
-- **Zero Hallucination Trust Model**: Grounded prompts restrict answers to provided sources.
-- **Multimodal Source Support**: Text, scanned images (OCR), structured tables, audio, and video.
-- **Dual RAG Engine Architecture**: Custom production hybrid engine + LangChain LCEL course-compatibility engine.
-- **Multilingual Support**: First-class Arabic and English cross-lingual QA, RTL interface, and multilingual embeddings.
-- **8 GB Memory Optimised**: Custom generation queue and profiles tuned for Apple Silicon Macs and CPU Spaces.
+## Architecture
 
----
-
-## 3. Why EnterpriseRAG?
-
-Traditional RAG prototypes suffer from four major production failures:
-1. **Blind Hallucinations**: Standard LLMs construct plausible answers when evidence is missing.
-2. **Media Blindness**: Inability to index or search audio, video, or scanned documents.
-3. **Resource Thrashing**: Unbounded parallel LLM calls stalling resource-constrained hardware (e.g. 8 GB RAM).
-4. **Lack of Observability**: No empirical evaluation metrics, accuracy tracking, or user feedback pipelines.
-
-EnterpriseRAG addresses each challenge with deterministic verification, faster-whisper video intelligence, single-call intelligence workflows, and integrated evaluation dashboards.
-
----
-
-## 4. Core Capabilities
-
-- **Document RAG**: Grounded QA over PDF, DOCX, and TXT with sentence-boundary chunking.
-- **Audio & Video Intelligence**: Automatic transcription, chapter segmentation, timestamp citations, and interactive video playback.
-- **Scanned PDF OCR**: Automatic low-density page detection with Tesseract OCR fallback.
-- **Structured Table Extraction**: `pdfplumber`-backed table cell coordinates and table QA.
-- **Deep Intelligence Workflows**: Grounded Summaries, Consolidated Document Comparisons, and Multi-Section Research Reports.
-- **Action Template Library**: 15+ pre-defined templates (CV Analysis, Meeting Minutes, Quiz Generation, Contract Audit).
-- **Evaluation Dashboard**: Real-time correctness, faithfulness, latency, and retrieval accuracy tracking.
-- **User Feedback System**: Answer feedback upvoting, complaint reporting, and 1-click conversion to evaluation datasets.
-- **Security & Authentication**: Local JWT auth, password hashing, user-isolated knowledge bases, and IDOR protection.
-
----
-
-## 5. Portfolio Screenshots
-
-| View | Preview |
-| :--- | :--- |
-| **Hero Dashboard** | ![Hero Dashboard](artifacts/portfolio/hero-dashboard.png) |
-| **Document RAG & Citations** | ![Document RAG](artifacts/portfolio/document-rag.png) |
-| **Compare Documents** | ![Compare Documents](artifacts/portfolio/compare-documents.png) |
-| **Video Intelligence & Timestamps** | ![Video Intelligence](artifacts/portfolio/video-intelligence.png) |
-| **Evaluation Dashboard** | ![Evaluation Dashboard](artifacts/portfolio/evaluation-dashboard.png) |
-| **Arabic Multilingual Workspace** | ![Arabic Workspace](artifacts/portfolio/arabic-workspace.png) |
-| **Scanned PDF OCR** | ![Scanned PDF OCR](artifacts/portfolio/scanned-pdf-ocr.png) |
-| **Extracted Table Viewer** | ![Extracted Table](artifacts/portfolio/extracted-table.png) |
-| **Action Templates Library** | ![Templates Library](artifacts/portfolio/templates-library.png) |
-| **Feedback Analytics** | ![Feedback Analytics](artifacts/portfolio/feedback-analytics.png) |
-
----
-
-## 6. Document Intelligence
-
-EnterpriseRAG ingests documents through a multi-stage pipeline:
-1. **Validation**: Checksum SHA-256 verification and mime-type enforcement.
-2. **Extraction**: Structure-preserving extraction (headings, paragraphs, page numbers).
-3. **OCR Fallback**: Automatic triggering when page character density is under 50 characters.
-4. **Chunking**: Sentence-boundary awareness with configurable overlap (`chunk_size=800`, `chunk_overlap=120`).
-5. **Hybrid Indexing**: Dense vector embedding + BM25-style lexical index.
-
----
-
-## 7. Video Intelligence
-
-Process uploaded MP4/MKV/WAV files or public YouTube URLs:
-- **Transcription**: `faster-whisper` (`tiny`, `base`, or `small`; CPU `int8`, Arabic/English/auto).
-- **Secure YouTube ingestion**: Optional read-only yt-dlp cookie secret, private writable
-  runtime copy, Deno/EJS challenge solving, safe terminal errors, and direct-upload fallback.
-- **Segmentation**: Sentence-level timestamp alignment.
-- **Smart Chapters**: Automatic chapter boundaries and key points.
-- **Timestamp Citations**: Clicking a citation jumps directly to that timestamp in the embedded video player.
-
----
-
-## 8. Custom RAG Engine (Default Production)
-
-The default production engine uses a custom pipeline:
-- **Query Rewriting**: Standalone query generation for conversational follow-ups.
-- **Hybrid Retrieval**: Dense cosine similarity (0.45) + Lexical BM25 (0.30) + Reranking (0.25).
-- **Claim Verification**: Deterministic sentence-level claim matching against retrieved context.
-- **Concurrency Queue**: Process-wide semaphore enforcing serial LLM generation on 8 GB RAM.
-
----
-
-## 9. LangChain Engine (Course-Compatibility Layer)
-
-EnterpriseRAG includes a complete parallel engine built on **LangChain & LCEL**:
-- Composed LCEL runnable chains (`QUERY_REWRITE_PROMPT | llm | PydanticOutputParser`).
-- Persistent FAISS vector store indexing.
-- Direct course-compatible class abstractions (`EnterpriseGenerationLLM`, `LangChainDocumentPipeline`).
-- Mode switchable dynamically via configuration (`RAG_ENGINE=langchain`).
-
----
-
-## 10. Arabic and Multilingual Support
-
-First-class support for Modern Standard Arabic and cross-lingual querying:
-- **Multilingual Embeddings**: Benchmarked `intfloat/multilingual-e5-small` with correct
-  query/passage prefixes and explicit reindex protection.
-- **RTL Interface**: Dynamic right-to-left rendering for primarily Arabic content.
-- **Cross-Lingual QA**: Ask questions in Arabic against English documents or vice versa.
-
----
-
-## 11. OCR and Table Extraction
-
-- **Scanned PDF OCR**: Integrates `pytesseract` and `pdf2image` to extract scanned text smoothly.
-- **Structured Tables**: Extracted with `pdfplumber`, indexed with table-aware headers, and downloadable as CSV/JSON.
-
----
-
-## 12. Evaluation Dashboard
-
-Integrated observability tracking:
-- **Metrics**: Answer Correctness, Faithfulness, Citation Validity, Median & P95 Latency.
-- **Engine Benchmarking**: Side-by-side performance breakdown (Custom vs. LangChain).
-- **Exporting**: Export evaluation results to JSON, CSV, or Markdown reports.
-
----
-
-## 13. Low-Memory Optimisation (8 GB Apple Silicon & CPU Spaces)
-
-Optimised specifically for limited-memory environments:
-- **Single-Call Compare**: Reduced Compare from 6 sequential LLM calls to 1 consolidated call (>80% latency reduction).
-- **Shared Model Adapter**: Eliminates duplicate model instances in LangChain mode.
-- **Generation Queue**: `asyncio.Semaphore` queue preventing OOM thrashing.
-- **Deterministic Timeouts**: Route-level `asyncio.wait_for` (HTTP 504) and frontend `AbortController`.
-
----
-
-## 14. Security
-
-- **Untrusted Context Isolation**: Source passages are demarcated with `[BEGIN_UNTRUSTED_SOURCE]` tags to prevent prompt injection.
-- **SSRF Protection**: Strict URL scheme and private subnet validation for public video fetching.
-- **IDOR Protection**: Access control checks on user-owned knowledge bases and documents.
-- **JWT Authentication**: Password hashing with `bcrypt` and secure HTTP Bearer tokens.
-
----
-
-## 15. Architecture
-
-```text
-               +-------------------------------------------------------+
-               |  React 19 + TypeScript Workspace (RTL / Light / Dark) |
-               +-------------------------------------------------------+
-                                           |
-                                           v  (FastAPI REST Endpoints)
-+-----------------------------------------------------------------------------------------------+
-|                                      EnterpriseRAG Backend                                    |
-|                                                                                               |
-|  +------------------------+  +------------------------+  +---------------------------------+  |
-|  |   Document Pipeline    |  |     Media Pipeline     |  |       Evaluation & Feedback     |  |
-|  |  (Pdf/Docx/OCR/Tables)  |  |  (Whisper/Subtitles)   |  |   (Datasets/Metrics/Analytics)  |  |
-|  +------------------------+  +------------------------+  +---------------------------------+  |
-|               |                          |                                |                   |
-|               +--------------------------+--------------------------------+                   |
-|                                          v                                                    |
-|  +-----------------------------------------------------------------------------------------+  |
-|  |                       Hybrid Vector Store & Retrieval Layer                             |  |
-|  |     (Relational Float32 / FAISS + MiniLM Embeddings + BM25 Lexical + Reranker)          |  |
-|  +-----------------------------------------------------------------------------------------+  |
-|                                          |                                                    |
-|                                          v                                                    |
-|  +-----------------------------------------------------------------------------------------+  |
-|  |                      Generation Queue & Model Adapter Layer                             |  |
-|  |      (asyncio.Semaphore Queue + Qwen2.5-0.5B / Custom Engine / LangChain LCEL)          |  |
-|  +-----------------------------------------------------------------------------------------+  |
-+-----------------------------------------------------------------------------------------------+
-                                           |
-                                           v
-                       +---------------------------------------+
-                       |  Local Storage / SQLite Database / HF |
-                       +---------------------------------------+
+```mermaid
+flowchart LR
+    Browser[React + TypeScript SPA] -->|same-origin /api/v1| Proxy[Nginx + HTTPS]
+    Proxy --> API[FastAPI]
+    API --> Auth[Signed demo session + rate/size limits]
+    API --> Docs[Document extraction / OCR / tables]
+    API --> Media[ffmpeg + faster-whisper + yt-dlp best effort]
+    Docs --> Index[SQLite vectors or LangChain FAISS]
+    Media --> Index
+    API --> Gate[Bounded shared heavy-operation gate]
+    Gate --> Qwen[Qwen2.5 0.5B CPU]
+    Gate --> Whisper[faster-whisper base CPU int8]
+    Index --> E5[multilingual-e5-small]
+    API --> Data[(SQLite + persistent uploads)]
 ```
 
----
+### RAG data flow
 
-## 16. Technology Stack
+```mermaid
+flowchart TD
+    Upload[Validated upload] --> Extract[Extract text / transcribe speech]
+    Extract --> Chunk[Structure-aware chunks]
+    Chunk --> Embed[E5 passage embeddings]
+    Embed --> Store[(Relational vectors or FAISS)]
+    Question[Arabic or English question] --> Retrieve[Dense + lexical retrieval]
+    Store --> Retrieve
+    Retrieve --> Rerank[Rerank + evidence threshold]
+    Rerank -->|insufficient evidence| Refuse[Grounded not-found response]
+    Rerank --> Prompt[Untrusted-context prompt]
+    Prompt --> Generate[Bounded Qwen generation]
+    Generate --> Verify[Claim/support verification]
+    Verify --> Answer[Answer + citations]
+```
 
-- **Backend**: Python 3.11+, FastAPI, SQLAlchemy, Alembic, Pydantic v2, PyPDF, pdfplumber, pytesseract.
-- **AI & NLP**: Hugging Face Transformers, Sentence-Transformers, PyTorch, FAISS, LangChain, faster-whisper.
-- **Frontend**: React 19, TypeScript, Vite, Lucide Icons, Vanilla CSS Design System.
-- **Testing & Quality**: Pytest, Playwright E2E, Ruff, Docker.
+## Model choices
 
----
+- `intfloat/multilingual-e5-small` is the AWS embedding default because the measured
+  three-case Arabic/English fixture improved from 1/3 top-1 with MiniLM to 2/3 top-1 with
+  E5. Existing indexes must be explicitly rebuilt when the embedding model changes.
+- `Qwen/Qwen2.5-0.5B-Instruct` is small enough for the 2 vCPU / 4 GB Lightsail target, but
+  CPU answers can still take roughly a minute or more. The AWS profile uses deterministic
+  decoding, 96 new tokens, 3,000 context characters, two CPU threads, and no startup warm.
+- `faster-whisper` `base`, CPU `int8`, two threads, and beam size 3 is the AWS default. The
+  transcription model unloads after each constrained-host job.
 
-## 17. Quick Start
+Measured values above come from the committed
+[`docs/aws-cpu-deployment.md`](docs/aws-cpu-deployment.md) benchmark tables. They were
+captured on a local CPU host on 2026-07-27; they are not Lightsail performance guarantees.
+Additional measured local results are recorded in
+[`artifacts/performance-summary.md`](artifacts/performance-summary.md).
+
+## Development
+
+Requirements: Python 3.11+, Node.js 20+, ffmpeg, Poppler, and Tesseract.
 
 ```bash
-# 1. Clone repository
-git clone https://github.com/fariskishtah/enterprise-rag-platform.git
-cd enterprise-rag-platform
-
-# 2. Setup backend environment
 python3 -m venv backend/.venv
 backend/.venv/bin/pip install -e 'backend[dev,media]'
+npm ci --prefix frontend
 
-# 3. Setup frontend dependencies
-cd frontend
-npm install
-
-# 4. Start development servers
-# Terminal 1: Backend
-cd ../backend
-.venv/bin/uvicorn app.main:app --reload --port 8000
-
-# Terminal 2: Frontend
-cd ../frontend
-npm run dev
-```
-
-Open `http://localhost:5173` to access the application.
-
----
-
-## 18. Local Development
-
-Run quality checks and tests locally:
-```bash
-# Run backend pytest suite
 cd backend
-.venv/bin/python -m pytest tests/ -v
-
-# Run linter
-.venv/bin/ruff check app/ tests/
-
-# Run frontend build
-cd ../frontend
-npx tsc --noEmit && npm run build
+.venv/bin/uvicorn app.main:app --reload --port 8000
 ```
 
----
-
-## 19. Hugging Face Spaces Deployment
-
-EnterpriseRAG is ready for deployment as a single-container **Hugging Face Docker Space**:
+In another terminal:
 
 ```bash
-# Build Docker image locally
-docker build -t enterprise-rag-space .
-
-# Test container on port 7860
-docker run -p 7860:7860 -e APP_RUNTIME_PROFILE=huggingface_demo enterprise-rag-space
+npm run dev --prefix frontend
 ```
 
-See [docs/huggingface-spaces.md](docs/huggingface-spaces.md) for full deployment instructions.
+Local development defaults to `ENTERPRISE_RAG_ACCESS_MODE=open`. Do not reuse that mode
+for the public AWS deployment.
 
----
+## Deterministic validation
 
-## 20. Configuration
-
-Key environment settings in `backend/.env` (or `.env.low-memory.example`):
-
-| Variable | Default | Description |
-| :--- | :--- | :--- |
-| `APP_RUNTIME_PROFILE` | `balanced` | Profile: `low_memory`, `balanced`, `quality`, `aws_cpu`, or `huggingface_demo` |
-| `RAG_ENGINE` | `custom` | Engine selection: `custom` or `langchain` |
-| `ENTERPRISE_RAG_GENERATION_MODEL_NAME` | `Qwen/Qwen2.5-0.5B-Instruct` | Local LLM Hugging Face model ID |
-| `ENTERPRISE_RAG_EMBEDDING_MODEL_NAME` | `sentence-transformers/all-MiniLM-L6-v2` | Embedding model ID |
-| `ENTERPRISE_RAG_MAX_CONCURRENT_GENERATIONS` | `2` | Process semaphore concurrency limit |
-| `ENTERPRISE_RAG_GENERATION_TIMEOUT_SECONDS` | `90` | Route generation timeout (seconds) |
-| `ENTERPRISE_RAG_YTDLP_COOKIES_FILE` | unset | Optional read-only cookie secret; copied privately for yt-dlp and never exposed by the API |
-| `ENTERPRISE_RAG_TRANSCRIPTION_LANGUAGE` | `auto` | Transcription language: `auto`, `ar`, or `en` |
-| `ENTERPRISE_RAG_WARM_MODELS_ON_STARTUP` | `false` | Non-blocking optional model warm-up |
-
----
-
-## 21. Testing
-
-EnterpriseRAG maintains comprehensive test coverage:
-- **Backend Tests**: 65+ unit, integration, and low-memory performance tests in `backend/tests/`.
-- **Frontend Build**: Strict TypeScript compilation and Vite bundling.
-- **E2E Visual Tests**: Playwright automated portfolio screenshot generation.
-
----
-
-## 22. Course-Technology Coverage
-
-EnterpriseRAG implements all core AI engineering course concepts:
-- Sentence Transformers & Vector Embeddings
-- FAISS Vector Store Integration
-- Hybrid Dense + BM25 Retrieval & Reranking
-- LangChain LCEL & Pydantic Output Parsers
-- Hugging Face Transformers Pipeline Integration
-- Audio & Video Transcription with Whisper
-- Quantization & Hardware Acceleration (MPS / CUDA / CPU)
-
----
-
-## 23. Project Structure
-
-```text
-EnterpriseRAG/
-├── .github/                 # Issue templates, PR template, CI workflows
-├── artifacts/               # Generated reports, evaluations, and portfolio screenshots
-├── backend/
-│   ├── app/
-│   │   ├── ai/              # Provider adapters, prompting, generation queue, LangChain runtime
-│   │   ├── api/             # FastAPI routes (auth, rag, intelligence, eval, feedback, demo)
-│   │   ├── core/            # Config, security, errors
-│   │   ├── db/              # SQLAlchemy session & database engine
-│   │   ├── document_processing/ # Extraction, OCR, table processing, chunking
-│   │   ├── media/           # Faster-whisper transcription & audio validation
-│   │   ├── models/          # SQLAlchemy database models
-│   │   ├── repositories/   # Data access repositories
-│   │   ├── schemas/         # Pydantic request/response schemas
-│   │   └── services/        # RAG, intelligence, eval, feedback, language services
-│   └── tests/               # Pytest suite
-├── docs/
-│   ├── architecture/        # 15 detailed architecture documents with Mermaid diagrams
-│   ├── demo-video/          # Recruiter demo video script, shot list, captions
-│   ├── case-study.md        # Technical engineering case study
-│   └── huggingface-spaces.md# Hugging Face Docker Space deployment guide
-├── frontend/
-│   ├── src/
-│   │   ├── api/             # API client with AbortController timeout handling
-│   │   ├── components/      # Reusable React components (AppShell, Badges, Citations)
-│   │   ├── pages/           # Pages (Chat, Intelligence, Eval, Feedback, Templates, Landing)
-│   │   └── types.ts         # TypeScript interface declarations
-├── scripts/                 # Portfolio screenshot generation script
-├── Dockerfile               # Multi-stage Docker Space deployment file
-├── start-space.sh           # Entrypoint script for Hugging Face Space
-└── README.md                # Root project documentation
+```bash
+npm ci --prefix frontend
+npm run build --prefix frontend
+npm run test --prefix frontend
+ruff check backend/app/ backend/tests/ backend/scripts/ course_demo/
+pytest backend/tests/ -v -m "not real_models and not real_transcription"
 ```
 
----
+Real Hugging Face and Whisper tests remain available through the registered
+`real_models` and `real_transcription` markers, but are intentionally excluded from CI.
+The release also includes production Playwright smoke coverage for the landing, login,
+protected routes, legal pages, same-origin API requests, direct route refresh, RTL, mobile
+layout, terminal error states, and browser diagnostics.
 
-## 24. Known Limitations
+Latest local release validation (2026-07-27):
 
-- **OCR Speed**: Scanned PDF OCR via Tesseract on CPU takes ~2–4 seconds per page.
-- **LLM Context Window**: 0.5B models perform best with context under 4,000 characters.
-- **CPU Transcription**: Whisper `small` model requires ~5–10s per minute of audio on CPU.
+| Check | Result |
+| --- | --- |
+| Frontend clean install | 165 packages installed; npm reported 0 vulnerabilities |
+| Frontend production build | Passed; TypeScript and Vite completed, 1,604 modules transformed |
+| Frontend unit tests | 8 files passed, 11 tests passed |
+| Backend Ruff | Passed |
+| Backend deterministic suite | 116 passed, 3 real-model/transcription tests deselected, 2 dependency deprecation warnings |
+| Production Playwright smoke | 4 passed; console, page, asset, and same-origin API diagnostics clean |
+| Compose and shell syntax | Compose config passed; `bash -n` passed for deployment scripts |
 
----
+The production browser smoke used an existing compatible runtime image with the current
+source and freshly built frontend mounted into a disposable container. A clean image build
+was also attempted, but the local Docker data store was full during `apt-get`; no images,
+containers, volumes, or build cache were pruned. A fresh image build remains a release-host
+check after Docker disk capacity is restored.
 
-## 25. Roadmap
+## Docker and AWS deployment
 
-- [x] Grounded RAG with citations and verification.
-- [x] Video & audio intelligence with timestamp citations.
-- [x] Low-memory profile for 8 GB RAM devices.
-- [x] Evaluation Dashboard & User Feedback System.
-- [x] Arabic & Multilingual cross-lingual support.
-- [x] Scanned PDF OCR & Structured Table Extraction.
-- [x] Action Template Library.
-- [x] Single-container Hugging Face Docker Space deployment.
-- [ ] Multi-tenant organization workspace isolation.
-- [ ] Streaming SSE generation response option.
+The single image builds the React frontend, installs the CPU backend/media runtime and
+Deno, runs Alembic migrations, and serves the SPA and `/api/v1` from port 7860.
 
----
+```bash
+docker build -t enterprise-rag:local .
+docker run --rm -p 127.0.0.1:7860:7860 --env-file .env.low-memory.example \
+  enterprise-rag:local
+```
 
-## 26. Author
+For AWS, follow [`docs/aws-cpu-deployment.md`](docs/aws-cpu-deployment.md). The production
+Compose file binds only `127.0.0.1:7860`, keeps application data and model caches in named
+volumes, mounts YouTube cookies read-only, rotates logs, and exposes a liveness check.
 
-**Faris Kishtah**
-- **GitHub**: [github.com/fariskishtah](https://github.com/fariskishtah)
-- **Repository**: [github.com/fariskishtah/enterprise-rag-platform](https://github.com/fariskishtah/enterprise-rag-platform)
+```bash
+cp .env.aws-cpu.example .env
+# Fill the required hash and session secret without committing .env.
+scripts/deploy-aws.sh --dry-run
+scripts/deploy-aws.sh
+```
 
----
+Key operations:
 
-## 27. Licence
+```bash
+docker compose -f docker-compose.aws.yml build app
+docker compose -f docker-compose.aws.yml up -d app
+docker compose -f docker-compose.aws.yml stop app
+docker compose -f docker-compose.aws.yml restart app
+docker compose -f docker-compose.aws.yml logs -f --tail=200 app
+curl --fail http://127.0.0.1:7860/api/v1/health
+scripts/backup-production.sh
+scripts/verify-backup.sh /home/ubuntu/enterprise-rag-backups/enterprise-rag-TIMESTAMP
+scripts/restore-production.sh /home/ubuntu/enterprise-rag-backups/enterprise-rag-TIMESTAMP --confirm
+```
 
-Distributed under the MIT Licence. See `LICENSE` for details.
+## Security and retention
+
+Implemented controls are documented in [`docs/security.md`](docs/security.md). The release
+uses adaptive password hashing, expiring signed sessions, cookie and origin controls,
+login lockout, per-route rate limits, request/body/upload limits, server-side filenames,
+signature checks, SSRF protections, path-contained cleanup, SQLite-safe backups, structured
+request logs, and reverse-proxy guidance. It does **not** claim a penetration test,
+certification, privacy guarantee, formal audit, multi-tenant isolation, or SLA.
+
+Production demo data expires after 24 hours by default. Cleanup is safe to preview:
+
+```bash
+docker compose -f docker-compose.aws.yml exec -T app \
+  python3 /workspace/backend/scripts/cleanup_demo_data.py --dry-run
+```
+
+## Health and operations
+
+- `GET /api/v1/health` — public, process liveness only.
+- `GET /api/v1/readiness` — public database, schema, storage, index, and cache checks.
+- `GET /api/v1/operations/status` — authenticated, secret-free runtime status and limits.
+
+Request logs are structured JSON and include method, path, status, duration, and request ID.
+The deployment deliberately avoids a heavyweight monitoring stack on the 4 GB host.
+
+## Known limitations
+
+- CPU generation is slow and intentionally serial; busy or full queues return a terminal
+  503 instead of creating overlapping model workers.
+- The public demo is a shared workspace, not a multi-tenant accounts product. `accounts`
+  is an integration boundary, not a complete identity-management system.
+- Unsupported questions should return insufficient evidence, but model output and
+  deterministic verification are not guarantees of correctness.
+- YouTube can require fresh cookies, Deno challenge support, a PO Token, or reject AWS IPs.
+  Direct media upload is the acceptance path.
+- SQLite and in-process rate/queue state suit a single small demo instance, not horizontal
+  scaling.
+- OCR and long media processing are CPU-intensive and bounded by public-demo limits.
+
+## Portfolio and release material
+
+- [Portfolio case study](docs/portfolio-case-study.md)
+- [90–120 second demo script](docs/demo-script.md)
+- [Public release checklist](docs/public-release-checklist.md)
+- [Architecture documentation](docs/architecture/overview.md)
+- [Course compatibility](docs/course-compatibility.md)
+
+## Roadmap
+
+- Durable distributed jobs and cancellation leases.
+- PostgreSQL/object storage for multi-instance deployment.
+- Organization/user authorization if `accounts` mode is promoted beyond its boundary.
+- Streaming responses and richer operational metrics.
+- Maintained PO Token provider integration if YouTube reliability becomes a requirement.
+
+## License
+
+MIT — see [`LICENSE`](LICENSE).

@@ -1,6 +1,6 @@
 # EnterpriseRAG System Architecture Overview
 
-EnterpriseRAG is an end-to-end multimodal AI platform designed for local-first, zero-hallucination knowledge intelligence across documents, media, and public web sources.
+EnterpriseRAG is an end-to-end multimodal AI platform designed for local-first, evidence-aware knowledge intelligence across documents, media, and public web sources. Retrieval, citations, and claim-support checks reduce unsupported output but do not guarantee correctness.
 
 ---
 

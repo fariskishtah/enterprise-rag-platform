@@ -36,6 +36,9 @@ WORKDIR /workspace
 # Install Python backend
 COPY backend/pyproject.toml /workspace/backend/
 COPY backend/app /workspace/backend/app
+COPY backend/alembic.ini /workspace/backend/alembic.ini
+COPY backend/migrations /workspace/backend/migrations
+COPY backend/scripts /workspace/backend/scripts
 # The production image runs on CPU. Installing torch from the default PyPI
 # index pulls the full CUDA runtime on Linux, even for CPU-only hosts.
 ARG PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
@@ -49,7 +52,7 @@ COPY --from=frontend-builder /build/dist /workspace/backend/app/static
 
 # Copy root scripts and startup configurations
 COPY start-space.sh /workspace/start-space.sh
-RUN chmod +x /workspace/start-space.sh
+RUN chmod +x /workspace/start-space.sh /workspace/backend/scripts/*.py
 
 # Environment settings for Hugging Face Docker Space
 ENV APP_RUNTIME_PROFILE=huggingface_demo \

@@ -48,7 +48,7 @@ test.describe.serial("EnterpriseRAG product journeys", () => {
     await expect(page.getByText("Ready for chat")).toBeVisible();
 
     await page.goto("/chat");
-    await page.getByRole("combobox").selectOption({ label: "Policy Evaluation" });
+    await page.getByLabel("Knowledge base").selectOption({ label: "Policy Evaluation" });
     const composer = page.getByLabel("Ask a grounded question");
     await composer.fill("How many remote days are employees allowed per week?");
     await composer.press("Enter");
@@ -158,7 +158,7 @@ test.describe.serial("EnterpriseRAG product journeys", () => {
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(viewport);
-      await page.goto("/");
+      await page.goto("/dashboard");
       await expect(
         page.getByRole("main").getByRole("link", { name: "Add knowledge", exact: true }),
       ).toBeVisible();

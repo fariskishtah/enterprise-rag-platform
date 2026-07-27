@@ -25,6 +25,10 @@ class ModelWarmupController:
             self._status = "loading"
             return True
 
+    def fail(self) -> None:
+        with self._lock:
+            self._status = "failed"
+
     def run(
         self,
         embedding_provider: EmbeddingProvider,

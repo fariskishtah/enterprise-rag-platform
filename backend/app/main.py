@@ -1,5 +1,6 @@
 import asyncio
 import os
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
@@ -28,6 +29,15 @@ from app.core.errors import (
     processing_error_handler,
     request_validation_handler,
 )
+from app.core.logging import configure_json_logging
+from app.core.middleware import (
+    AccessControlMiddleware,
+    LoginAttemptLimiter,
+    RateLimitMiddleware,
+    RequestBodyLimitMiddleware,
+    RequestContextMiddleware,
+    UploadConcurrencyMiddleware,
+)
 from app.db.base import Base
 from app.db.session import create_database_engine, create_session_factory
 from app.media.transcription import (
@@ -47,6 +57,7 @@ def create_app(
     transcription_provider: TranscriptionProvider | None = None,
 ) -> FastAPI:
     runtime_settings = settings or get_settings()
+    configure_json_logging()
     engine = create_database_engine(runtime_settings.database_url)
     session_factory = create_session_factory(engine)
     warmup_controller = ModelWarmupController()
@@ -60,14 +71,25 @@ def create_app(
         with suppress(ProcessingError):
             prepare_runtime_ytdlp_cookie(runtime_settings.ytdlp_cookies_file)
         if runtime_settings.warm_models_on_startup and warmup_controller.begin():
-            warmup_task = asyncio.create_task(
-                asyncio.to_thread(
-                    warmup_controller.run,
-                    app.state.embedding_provider,
-                    app.state.generation_provider,
-                    runtime_settings,
-                )
-            )
+            async def warm_models() -> None:
+                try:
+                    slot = await app.state.generation_queue.acquire()
+                    await app.state.generation_queue.execute(
+                        slot,
+                        lambda: warmup_controller.run(
+                            app.state.embedding_provider,
+                            app.state.generation_provider,
+                            runtime_settings,
+                        ),
+                        timeout=(
+                            runtime_settings.model_load_timeout_seconds
+                            + runtime_settings.generation_timeout_seconds
+                        ),
+                    )
+                except Exception:
+                    warmup_controller.fail()
+
+            warmup_task = asyncio.create_task(warm_models())
         yield
         if warmup_task is not None and not warmup_task.done():
             warmup_task.cancel()
@@ -79,7 +101,13 @@ def create_app(
         lifespan=lifespan,
     )
     app.state.settings = runtime_settings
+    app.state.engine = engine
+    app.state.started_at = time.time()
     app.state.session_factory = session_factory
+    app.state.login_limiter = LoginAttemptLimiter(
+        runtime_settings.login_max_attempts,
+        runtime_settings.login_lockout_minutes * 60,
+    )
     app.state.file_storage = LocalFileStorage(
         runtime_settings.storage_path, runtime_settings.max_upload_bytes
     )
@@ -99,7 +127,10 @@ def create_app(
         embedding_provider is None or generation_provider is None
     ):
         os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
-        os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+        os.environ.setdefault(
+            "TOKENIZERS_PARALLELISM",
+            str(runtime_settings.tokenizer_parallelism).lower(),
+        )
         try:
             import torch
 
@@ -151,17 +182,23 @@ def create_app(
 
     # ── Generation concurrency queue ─────────────────────────────────
     app.state.generation_queue = GenerationQueue(
-        max_concurrent=runtime_settings.max_concurrent_generations,
+        max_concurrent=runtime_settings.max_concurrent_heavy_operations,
         queue_timeout=runtime_settings.generation_queue_timeout_seconds,
+        max_queue_size=runtime_settings.heavy_queue_max_size,
     )
 
+    app.add_middleware(AccessControlMiddleware, settings=runtime_settings)
+    app.add_middleware(RateLimitMiddleware, settings=runtime_settings)
+    app.add_middleware(UploadConcurrencyMiddleware, settings=runtime_settings)
+    app.add_middleware(RequestBodyLimitMiddleware, settings=runtime_settings)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=runtime_settings.cors_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization"],
+        allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
     )
+    app.add_middleware(RequestContextMiddleware)
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(ProcessingError, processing_error_handler)
     app.add_exception_handler(RequestValidationError, request_validation_handler)
@@ -180,10 +217,11 @@ def create_app(
         async def serve_spa(full_path: str) -> FileResponse:
             if full_path.startswith("api/"):
                 raise StarletteHTTPException(status_code=404)
-            file_path = static_dir / full_path
-            if file_path.is_file():
+            static_root = static_dir.resolve()
+            file_path = (static_root / full_path).resolve()
+            if static_root in file_path.parents and file_path.is_file():
                 return FileResponse(file_path)
-            return FileResponse(static_dir / "index.html")
+            return FileResponse(static_root / "index.html")
 
     return app
 

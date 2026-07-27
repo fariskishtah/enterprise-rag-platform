@@ -6,12 +6,12 @@ Enterprise organization knowledge is fragmented across PDF contracts, scanned do
 ---
 
 ## 2. Product Vision
-To build an end-to-end, multimodal knowledge intelligence platform running 100% locally or on low-resource containerized environments (8 GB RAM / CPU Spaces) with passage-level verifiable citations, video timestamp synchronization, and zero third-party API dependencies.
+To build an end-to-end, local-first multimodal knowledge intelligence platform for low-resource containerized environments, with passage-level citations and video timestamp synchronization. Local file workflows do not require a hosted inference API; optional YouTube imports still depend on third-party availability.
 
 ---
 
 ## 3. Why RAG?
-Retrieval-Augmented Generation (RAG) grounds language models by inserting retrieved, verifiable passages directly into the prompt context, eliminating hallucinations and enabling deterministic claim verification.
+Retrieval-Augmented Generation (RAG) grounds language models by inserting retrieved passages directly into the prompt context. This can reduce unsupported answers and enables claim-support checks, but it does not eliminate model errors.
 
 ---
 
@@ -51,7 +51,7 @@ Engineered a hybrid retrieval system combining dense vector search (`sentence-tr
 ---
 
 ## 11. Lexical Scoring
-Integrated BM25-style term frequency scoring over normalized text tokens to guarantee exact match retrieval for product codes, names, and numbers.
+Integrated BM25-style term frequency scoring over normalized text tokens to improve exact-term retrieval for product codes, names, and numbers.
 
 ---
 
@@ -132,7 +132,7 @@ Configured `LangChainEngineRuntime` (`langchain_force_wrapper=True`) to wrap the
 ---
 
 ## 27. Generation Semaphore
-Implemented a process-wide `asyncio.Semaphore` queue (`GenerationQueue`, `max_concurrent=1`), serializing model inference to guarantee zero OOM thrashing on 8 GB RAM.
+Implemented a bounded process-wide generation queue, serializing heavy model work to reduce memory-pressure and OOM risk on constrained hosts.
 
 ---
 
@@ -152,7 +152,7 @@ Created `APP_RUNTIME_PROFILE=low_memory` to automatically enforce 4,000 characte
 ---
 
 ## 31. Testing Methodology
-Built a multi-tier test architecture: 65+ backend unit & integration tests, Playwright automated screenshot tests, and ruff linting.
+Built a multi-tier test architecture with backend unit/integration tests, Playwright browser tests, frontend unit tests, and Ruff linting. Current counts are recorded in the release documentation rather than frozen in this historical narrative.
 
 ---
 
@@ -162,20 +162,24 @@ Implemented an empirical Evaluation System (`EvaluationService`) calculating cor
 ---
 
 ## 33. Security Controls
-Enforced untrusted context isolation tags (`[BEGIN_UNTRUSTED_SOURCE]`), SSRF URL validation, bcrypt password hashing, JWT bearer token authorization, and IDOR resource checks.
+Enforced untrusted-context markers, SSRF URL validation, bcrypt password hashing, signed expiring session cookies, bounded login attempts, upload validation, and public-demo quotas. The shared demo is not presented as a multi-tenant authorization boundary.
 
 ---
 
 ## 34. Results & Metrics
 
-### Before vs. After Latency & Reliability
+### Historical development observations
+
+The figures below were recorded during earlier local development runs, not under the current
+public-release test protocol. They are retained as engineering notes and must not be read as
+repeatable benchmarks, cloud results, or production guarantees.
 
 | Operation | Pre-Optimization Latency | Post-Optimization Latency | Change |
 | :--- | :--- | :--- | :--- |
 | **Document Comparison** | 38.5s – Infinite (Hangs) | **4.2s – 7.8s** | **>80% Faster** |
 | **Research Report** | 32.1s – Infinite (Hangs) | **8.5s – 14.2s** | **>60% Faster** |
 | **Follow-up RAG Query** | 3.8s | **2.1s – 3.2s** | **25% Faster** |
-| **Memory Footprint (RAM)** | Swap Thrashing / OOM | **<2.5 GB Stable** | **OOM Eliminated** |
+| **Memory Footprint (RAM)** | Swap Thrashing / OOM | **<2.5 GB observed in the cited run** | **No OOM observed in that run** |
 
 ### Custom Engine vs. LangChain Engine Trade-Offs
 
@@ -206,7 +210,7 @@ Enforced untrusted context isolation tags (`[BEGIN_UNTRUSTED_SOURCE]`), SSRF URL
 ## 36. Lessons Learned
 1. Consolidating multi-prompt workflows into a single structured prompt yields massive performance gains on local hardware.
 2. Hard process-level semaphores are essential for preventing memory thrashing on 8 GB devices.
-3. Explicit verification gates prevent hallucinations far more effectively than prompt tuning alone.
+3. Explicit evidence and verification gates make unsupported output more visible than prompt tuning alone, but cannot guarantee correctness.
 
 ---
 

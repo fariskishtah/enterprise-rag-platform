@@ -24,7 +24,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e 'backend[dev,media]'
       - name: Run Ruff Linter
-        run: ruff check backend/app/ backend/tests/
+        run: ruff check backend/app/ backend/tests/ backend/scripts/ course_demo/
       - name: Run Pytest Suite
         run: pytest backend/tests/ -v -m "not real_models and not real_transcription"
 
@@ -45,3 +45,5 @@ jobs:
           cd frontend
           npx tsc --noEmit
           npm run build
+      - name: Run frontend unit tests
+        run: npm run test --prefix frontend

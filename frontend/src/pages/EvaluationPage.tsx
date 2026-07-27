@@ -95,25 +95,25 @@ export function EvaluationPage() {
         <div className="metric-card">
           <span className="metric-label">Correctness Rate</span>
           <strong className="metric-value">
-            {latestRun ? `${(latestRun.correctness_rate * 100).toFixed(0)}%` : "95%"}
+            {latestRun ? `${(latestRun.correctness_rate * 100).toFixed(0)}%` : "No runs"}
           </strong>
         </div>
         <div className="metric-card">
           <span className="metric-label">Faithfulness</span>
           <strong className="metric-value">
-            {latestRun ? `${(latestRun.faithfulness_rate * 100).toFixed(0)}%` : "98%"}
+            {latestRun ? `${(latestRun.faithfulness_rate * 100).toFixed(0)}%` : "No runs"}
           </strong>
         </div>
         <div className="metric-card">
           <span className="metric-label">Citation Accuracy</span>
           <strong className="metric-value">
-            {latestRun ? `${(latestRun.citation_accuracy * 100).toFixed(0)}%` : "94%"}
+            {latestRun ? `${(latestRun.citation_accuracy * 100).toFixed(0)}%` : "No runs"}
           </strong>
         </div>
         <div className="metric-card">
           <span className="metric-label">Median Latency</span>
           <strong className="metric-value">
-            {latestRun ? `${latestRun.median_latency_ms}ms` : "210ms"}
+            {latestRun ? `${latestRun.median_latency_ms}ms` : "No runs"}
           </strong>
         </div>
       </div>

@@ -45,6 +45,9 @@ class MediaSourceRead(BaseModel):
     ingestion_date: datetime | None
     created_at: datetime
     updated_at: datetime
+    last_accessed_at: datetime
+    expires_at: datetime | None
+    is_protected: bool
 
 
 class MediaSourceList(BaseModel):

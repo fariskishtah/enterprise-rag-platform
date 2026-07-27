@@ -1,16 +1,17 @@
-# Deployment notes
+# Deployment overview
 
-The included profile is intentionally local and single-tenant. Before network exposure:
+Local development is intentionally open. The public AWS profile is a single-container,
+single-instance demo behind Nginx and HTTPS.
 
-- add authentication, RBAC, authorization on every knowledge-base lookup, and tenant keys;
-- replace in-process tasks with a durable queue and idempotency/lease control;
-- use managed PostgreSQL and pgvector plus durable object storage;
-- terminate TLS and apply request/body/rate limits at an ingress;
-- isolate ffmpeg/yt-dlp/transcription workers with CPU, memory, network, and time limits;
-- use signed media URLs, malware scanning, audit logs, retention, backups, and a secrets
-  manager;
-- split CPU generation and GPU transcription into independently scalable worker pools;
-- add health/readiness checks for database, model cache, ffmpeg, and queue dependencies.
+```text
+Internet :443 → Nginx/Certbot → 127.0.0.1:7860 → React + FastAPI
+                                                ├── SQLite/data volume
+                                                └── Hugging Face cache volume
+```
 
-Do not mount model or upload directories world-readable. Keep temporary storage on an
-encrypted volume and configure lifecycle cleanup.
+Use [`aws-cpu-deployment.md`](aws-cpu-deployment.md) for the exact build, authentication,
+DNS, firewall, HTTPS, backup, cleanup, rollback, snapshot, and monitoring procedure.
+
+The release does not yet provide multi-tenant authorization, durable distributed jobs,
+managed PostgreSQL/object storage, malware scanning, or independently scalable workers.
+Those are explicit future boundaries, not claims about the public demo.

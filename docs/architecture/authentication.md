@@ -1,37 +1,46 @@
-# Authentication & Authorization Architecture
+# Authentication and access boundary
 
-EnterpriseRAG implements secure local JWT authentication with user-scoped resource ownership and role-based access control.
+EnterpriseRAG has three explicit access modes:
 
----
+- `open` is the local-development default and does not require a session.
+- `demo_password` is the AWS public-demo mode. One bcrypt-verified password creates a
+  signed, expiring, HTTP-only session cookie.
+- `accounts` retains the email/password API for development and compatibility. It creates
+  signed account tokens and sets the same session cookie.
 
-## Auth & Resource Ownership Flow
+Production settings fail closed: a production/AWS environment without an explicit access
+mode selects `demo_password`, and protected production modes require both a strong session
+secret and, for the demo mode, a valid bcrypt password hash.
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    actor Client as React Client
-    participant AuthAPI as Auth Routes (/api/v1/auth)
-    participant JWT as JWT Security Core
-    participant DB as SQLite DB
-    participant Resource as KB / Document Services
+    actor Browser
+    participant API as FastAPI auth routes
+    participant Guard as Access middleware
+    participant App as Protected API / SPA
 
-    Client->>AuthAPI: POST /login (email, password)
-    AuthAPI->>DB: Fetch User & Check bcrypt Password Hash
-    DB-->>AuthAPI: User Validated
-    AuthAPI->>JWT: Generate JWT Access Token (user_id, role)
-    JWT-->>Client: Return Bearer Token
-
-    Client->>Resource: GET /knowledge-bases (Authorization: Bearer <token>)
-    Resource->>JWT: Verify Token Signature & Expiration
-    JWT-->>Resource: Validated (user_id=123, role=user)
-    Resource->>DB: Query KnowledgeBases WHERE user_id = 123
-    DB-->>Client: User-Scoped Knowledge Bases
+    Browser->>API: POST /api/v1/auth/demo/login (password)
+    API->>API: Verify bcrypt hash and bounded attempt policy
+    API-->>Browser: Signed expiring HTTP-only cookie
+    Browser->>Guard: Request with same-origin cookie
+    Guard->>Guard: Verify signature, expiry, token kind
+    Guard->>App: Authenticated request
 ```
 
----
+## Implemented controls
 
-## Security Features
-- **Password Hashing**: `passlib` with `bcrypt`.
-- **Stateless Tokens**: HS256 JWT tokens with configurable expiration (`ACCESS_TOKEN_EXPIRE_MINUTES`).
-- **IDOR Protection**: Access verification on every resource endpoint (Knowledge Base, Document, Chat Session, Report, Feedback).
-- **Admin Role**: System health, queue monitoring, and aggregate metrics endpoint access.
+- Bcrypt password hashing and verification.
+- HMAC-SHA256 signed tokens with issue/expiry timestamps and a random token identifier.
+- HTTP-only, `SameSite=Lax` cookies; the AWS profile enables `Secure`.
+- Same-origin checks on cookie-authenticated unsafe methods.
+- Bounded per-client failed-login lockout and route rate limits.
+- Generic authentication errors that do not reveal stored credentials.
+- Explicit logout cookie clearing.
+
+## Boundary and limitations
+
+The public demo is one shared workspace behind a common password. It is not multi-tenant
+SaaS, and the current data models do not provide organization- or user-level row isolation.
+The in-process lockout and rate-limit state is intentionally single-instance. The controls
+above reduce exposure for the documented public-demo deployment; they are not a claim of
+penetration testing, compliance certification, or complete protection against abuse.

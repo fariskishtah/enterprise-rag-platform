@@ -14,3 +14,11 @@ artifacts/playwright-report
 backend/.venv
 frontend/node_modules
 frontend/dist
+.env
+*cookies*.txt
+backups
+certificates
+*.pem
+*.key
+playwright-report
+test-results

@@ -8,6 +8,7 @@ import {
   Command,
   FileStack,
   FlaskConical,
+  LogOut,
   Menu,
   Moon,
   PanelLeftClose,
@@ -23,12 +24,12 @@ import {
 } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 
-import { getRagConfiguration } from "../api/client";
+import { getRagConfiguration, logoutSession } from "../api/client";
 import type { RagConfiguration } from "../types";
 
 const navigation = [
-  { to: "/landing", label: "Product Showcase", icon: Sparkles, end: true },
-  { to: "/", label: "Overview", icon: CircleGauge, end: true },
+  { to: "/", label: "Product Showcase", icon: Sparkles, end: true },
+  { to: "/dashboard", label: "Overview", icon: CircleGauge, end: true },
   { to: "/knowledge-bases", label: "Knowledge", icon: Boxes, end: false },
   { to: "/upload", label: "Source library", icon: FileStack, end: false },
   { to: "/chat", label: "Research chat", icon: Bot, end: false },
@@ -207,10 +208,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             </strong>
             <small>
               {modelConfiguration
-                ? `${modelConfiguration.model_device.toUpperCase()} · private`
+                ? `${modelConfiguration.model_device.toUpperCase()} · local inference`
                 : modelConfigurationChecked
-                  ? "Retrying · private"
-                  : "Private · no external API"}
+                  ? "Status unavailable · retrying"
+                  : "On-demand model runtime"}
             </small>
           </span>
         </div>
@@ -228,6 +229,21 @@ export function AppShell({ children }: { children: ReactNode }) {
             {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
             <span className="brand-copy">Collapse</span>
           </button>
+          <button
+            className="nav-link"
+            title="Sign out"
+            onClick={() => {
+              logoutSession()
+                .catch(() => undefined)
+                .finally(() => {
+                  window.localStorage.removeItem("token");
+                  window.location.assign("/");
+                });
+            }}
+          >
+            <LogOut size={18} />
+            <span className="brand-copy">Sign out</span>
+          </button>
         </div>
       </aside>
 
@@ -243,7 +259,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="topbar-actions">
             <span className="privacy-chip">
               <span />
-              Local & private
+              Local model runtime
             </span>
             <button
               className="icon-button"
@@ -252,9 +268,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
             </button>
-            <span className="user-avatar" title="Local user">
-              FK
-            </span>
+            <span className="user-avatar" title="Demo session">ER</span>
           </div>
         </header>
         <main className="page-container">{children}</main>

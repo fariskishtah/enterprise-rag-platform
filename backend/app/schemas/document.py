@@ -32,6 +32,9 @@ class DocumentRead(BaseModel):
     indexing_completed_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    last_accessed_at: datetime
+    expires_at: datetime | None
+    is_protected: bool
 
 
 class DocumentList(BaseModel):

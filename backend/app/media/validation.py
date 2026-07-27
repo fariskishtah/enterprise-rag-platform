@@ -27,6 +27,16 @@ MEDIA_TYPES = {
     ".wav": "audio/wav",
 }
 
+ALLOWED_DECLARED_MEDIA_TYPES = {
+    ".mp4": {"video/mp4", "application/octet-stream"},
+    ".mov": {"video/quicktime", "application/octet-stream"},
+    ".mkv": {"video/x-matroska", "application/octet-stream"},
+    ".webm": {"video/webm", "application/octet-stream"},
+    ".m4a": {"audio/mp4", "audio/x-m4a", "application/octet-stream"},
+    ".mp3": {"audio/mpeg", "audio/mp3", "application/octet-stream"},
+    ".wav": {"audio/wav", "audio/x-wav", "audio/wave", "application/octet-stream"},
+}
+
 
 def validate_media_filename(filename: str) -> tuple[str, str]:
     safe_name = Path(filename).name
@@ -38,6 +48,35 @@ def validate_media_filename(filename: str) -> tuple[str, str]:
             status_code=415,
         )
     return extension, MEDIA_TYPES[extension]
+
+
+def validate_declared_media_type(media_type: str | None, extension: str) -> None:
+    declared = (media_type or "application/octet-stream").split(";", 1)[0].strip().lower()
+    if declared not in ALLOWED_DECLARED_MEDIA_TYPES[extension]:
+        raise UploadValidationError(
+            code="unsupported_media_type",
+            message="The declared media type does not match a supported audio or video upload.",
+            status_code=415,
+        )
+
+
+def validate_media_content(path: Path, extension: str) -> None:
+    header = path.read_bytes()[:16]
+    valid = {
+        ".wav": header.startswith(b"RIFF") and header[8:12] == b"WAVE",
+        ".mp3": header.startswith(b"ID3")
+        or (len(header) >= 2 and header[0] == 0xFF and header[1] & 0xE0 == 0xE0),
+        ".m4a": len(header) >= 12 and header[4:8] == b"ftyp",
+        ".mp4": len(header) >= 12 and header[4:8] == b"ftyp",
+        ".mov": len(header) >= 12 and header[4:8] == b"ftyp",
+        ".mkv": header.startswith(b"\x1aE\xdf\xa3"),
+        ".webm": header.startswith(b"\x1aE\xdf\xa3"),
+    }.get(extension, False)
+    if not valid:
+        raise UploadValidationError(
+            code="invalid_media_signature",
+            message="The uploaded file signature does not match its supported media format.",
+        )
 
 
 def is_youtube_url(url: str) -> bool:

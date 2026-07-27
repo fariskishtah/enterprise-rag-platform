@@ -5,18 +5,21 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.ai.generation_queue import GenerationQueue
 from app.ai.interfaces import EmbeddingProvider, GenerationProvider
 from app.api.dependencies import (
     get_db_session,
     get_embedding_provider,
     get_generation_provider,
+    get_generation_queue,
     get_runtime_settings,
 )
 from app.core.config import Settings
+from app.core.errors import GenerationQueueFullError, GenerationTimeoutError
 from app.models.evaluation import EvaluationDataset, EvaluationRun
 from app.services.evaluation import EvaluationService
 from app.services.rag import RagService
@@ -25,17 +28,20 @@ router = APIRouter(prefix="/evaluation", tags=["evaluation"])
 
 
 class DatasetCreate(BaseModel):
-    knowledge_base_id: str
-    name: str
-    description: str | None = None
+    knowledge_base_id: str = Field(min_length=1, max_length=36)
+    name: str = Field(min_length=1, max_length=120)
+    description: str | None = Field(default=None, max_length=2000)
 
 
 class CaseCreate(BaseModel):
-    dataset_id: str
-    question: str
-    expected_answer: str | None = None
-    expected_citations: list[str] = []
-    language: str = "en"
+    dataset_id: str = Field(min_length=1, max_length=36)
+    question: str = Field(min_length=2, max_length=4000)
+    expected_answer: str | None = Field(default=None, max_length=8000)
+    expected_citations: list[Annotated[str, Field(min_length=1, max_length=128)]] = Field(
+        default_factory=list,
+        max_length=50,
+    )
+    language: str = Field(default="en", pattern="^(ar|en)$")
     is_supported: bool = True
 
 
@@ -115,12 +121,13 @@ def add_eval_case(
 
 
 @router.post("/runs", response_model=RunRead)
-def run_evaluation(
+async def run_evaluation(
     dataset_id: str,
     session: Annotated[Session, Depends(get_db_session)],
     settings: Annotated[Settings, Depends(get_runtime_settings)],
     embedding_provider: Annotated[EmbeddingProvider, Depends(get_embedding_provider)],
     generation_provider: Annotated[GenerationProvider, Depends(get_generation_provider)],
+    generation_queue: Annotated[GenerationQueue, Depends(get_generation_queue)],
 ) -> RunRead:
     svc = EvaluationService(session)
     rag_svc = RagService(
@@ -130,7 +137,23 @@ def run_evaluation(
         generation_provider=generation_provider,
     )
     try:
-        run = svc.run_evaluation(dataset_id, rag_svc, engine_name=settings.rag_engine)
+        slot = await generation_queue.acquire(
+            timeout=settings.generation_queue_timeout_seconds
+        )
+    except TimeoutError as exc:
+        raise GenerationQueueFullError(
+            "The server is busy with another model request. Please retry shortly."
+        ) from exc
+    try:
+        run = await generation_queue.execute(
+            slot,
+            lambda: svc.run_evaluation(
+                dataset_id,
+                rag_svc,
+                engine_name=settings.rag_engine,
+            ),
+            timeout=settings.media_processing_timeout_seconds,
+        )
         return RunRead(
             id=run.id,
             dataset_id=run.dataset_id,
@@ -145,6 +168,10 @@ def run_evaluation(
             median_latency_ms=run.median_latency_ms,
             p95_latency_ms=run.p95_latency_ms,
         )
+    except TimeoutError as exc:
+        raise GenerationTimeoutError(
+            "The evaluation run timed out. Use a smaller dataset and retry."
+        ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

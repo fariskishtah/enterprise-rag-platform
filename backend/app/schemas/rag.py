@@ -128,9 +128,9 @@ class RagConfigurationRead(BaseModel):
     embedding_model_cached: bool
     generation_model_cached: bool
     model_warm: bool
-    embedding_model_status: Literal["cold", "loading", "ready", "failed"] = "cold"
-    generation_model_status: Literal["cold", "loading", "ready", "failed"] = "cold"
-    warmup_status: Literal["cold", "loading", "ready", "failed"] = "cold"
+    embedding_model_status: Literal["cold", "loading", "ready", "busy", "failed"] = "cold"
+    generation_model_status: Literal["cold", "loading", "ready", "busy", "failed"] = "cold"
+    warmup_status: Literal["cold", "loading", "ready", "busy", "failed"] = "cold"
     vector_store: str
     top_k: int
     candidate_pool: int
@@ -152,3 +152,11 @@ class RagConfigurationRead(BaseModel):
     generation_queue_queued: int = 0
     generation_timeout_seconds: int = 90
     embedding_reindex_required: bool = False
+    maximum_upload_mb: int = 50
+    maximum_document_pages: int = 300
+    maximum_media_duration_minutes: int = 30
+    maximum_files_per_knowledge_base: int = 25
+    maximum_knowledge_bases: int = 5
+    maximum_concurrent_heavy_operations: int = 1
+    heavy_queue_max_size: int = 2
+    demo_data_retention_hours: int = 24

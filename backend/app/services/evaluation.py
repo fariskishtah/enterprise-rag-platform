@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import logging
+import re
 from time import perf_counter
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.errors import AppError
 from app.models.evaluation import (
+    MAX_EVALUATION_CASES_PER_DATASET,
     EvaluationCase,
     EvaluationDataset,
     EvaluationResult,
@@ -18,6 +21,14 @@ from app.schemas.rag import RagAskRequest
 from app.services.rag import RagService
 
 logger = logging.getLogger(__name__)
+
+
+def _answer_coverage(expected: str, actual: str) -> float:
+    expected_terms = set(re.findall(r"\w+", expected.casefold()))
+    if not expected_terms:
+        return 1.0
+    actual_terms = set(re.findall(r"\w+", actual.casefold()))
+    return len(expected_terms & actual_terms) / len(expected_terms)
 
 
 class EvaluationService:
@@ -52,6 +63,15 @@ class EvaluationService:
         )
         if dataset is None:
             raise ValueError("Evaluation dataset not found")
+        if dataset.case_count >= MAX_EVALUATION_CASES_PER_DATASET:
+            raise AppError(
+                status_code=422,
+                code="evaluation_case_quota_exceeded",
+                message=(
+                    "This evaluation dataset has reached the public-demo case limit. "
+                    "Create a smaller dataset or remove cases before adding more."
+                ),
+            )
 
         case = EvaluationCase(
             dataset_id=dataset_id,
@@ -75,6 +95,12 @@ class EvaluationService:
         )
         if dataset is None or not dataset.cases:
             raise ValueError("Evaluation dataset has no test cases")
+        if len(dataset.cases) > MAX_EVALUATION_CASES_PER_DATASET:
+            raise AppError(
+                status_code=422,
+                code="evaluation_case_quota_exceeded",
+                message="The evaluation dataset exceeds the public-demo case limit.",
+            )
 
         run = EvaluationRun(
             dataset_id=dataset_id,
@@ -90,6 +116,8 @@ class EvaluationService:
 
         passed_count = 0
         latencies: list[float] = []
+        faithfulness_scores: list[float] = []
+        citation_scores: list[float] = []
 
         for case in dataset.cases:
             started = perf_counter()
@@ -100,9 +128,35 @@ class EvaluationService:
                 elapsed_ms = (perf_counter() - started) * 1000
                 latencies.append(elapsed_ms)
 
-                is_passed = True
-                if not case.is_supported and not answer.not_found:
-                    is_passed = False
+                is_passed = answer.not_found == (not case.is_supported)
+                if case.is_supported and case.expected_answer:
+                    is_passed = is_passed and _answer_coverage(
+                        case.expected_answer,
+                        answer.answer,
+                    ) >= 0.5
+
+                returned_citations = {value.chunk_id for value in answer.citations}
+                expected_citations = set(case.expected_citations)
+                if expected_citations:
+                    citation_score = len(
+                        expected_citations & returned_citations
+                    ) / len(expected_citations)
+                    is_passed = is_passed and citation_score == 1.0
+                elif case.is_supported:
+                    citation_score = 1.0 if returned_citations else 0.0
+                else:
+                    citation_score = 1.0 if not returned_citations else 0.0
+                citation_scores.append(citation_score)
+
+                verification_status = str(answer.verification.status)
+                if (
+                    not case.is_supported and answer.not_found
+                ) or verification_status == "supported":
+                    faithfulness_scores.append(1.0)
+                elif verification_status == "partially_supported":
+                    faithfulness_scores.append(0.5)
+                else:
+                    faithfulness_scores.append(0.0)
 
                 if is_passed:
                     passed_count += 1
@@ -113,12 +167,14 @@ class EvaluationService:
                     passed=is_passed,
                     generated_answer=answer.answer,
                     verification_status=str(answer.verification.status),
-                    returned_citations=[c.chunk_id for c in answer.citations],
+                    returned_citations=sorted(returned_citations),
                     latency_ms=elapsed_ms,
                 )
                 self.session.add(res)
-            except Exception as exc:
+            except Exception:
                 elapsed_ms = (perf_counter() - started) * 1000
+                faithfulness_scores.append(0.0)
+                citation_scores.append(0.0)
                 res = EvaluationResult(
                     run_id=run.id,
                     case_id=case.id,
@@ -127,7 +183,7 @@ class EvaluationService:
                     verification_status="error",
                     returned_citations=[],
                     latency_ms=elapsed_ms,
-                    error_message=str(exc),
+                    error_message="Evaluation case failed.",
                 )
                 self.session.add(res)
 
@@ -139,8 +195,12 @@ class EvaluationService:
         run.passed_cases = passed_count
         run.failed_cases = len(dataset.cases) - passed_count
         run.correctness_rate = round(passed_count / len(dataset.cases), 2)
-        run.faithfulness_rate = 0.92
-        run.citation_accuracy = 0.90
+        run.faithfulness_rate = round(
+            sum(faithfulness_scores) / len(dataset.cases), 2
+        )
+        run.citation_accuracy = round(
+            sum(citation_scores) / len(dataset.cases), 2
+        )
         run.median_latency_ms = round(med_lat, 1)
         run.p95_latency_ms = round(p95_lat, 1)
 

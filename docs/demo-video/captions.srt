@@ -4,7 +4,7 @@ Welcome to EnterpriseRAG, an end-to-end multimodal knowledge intelligence platfo
 
 2
 00:00:15,000 --> 00:00:30,000
-Upload PDF documents, extract text, and index vectors locally in seconds.
+Upload PDF documents, extract text, and index vectors in a bounded local workflow.
 
 3
 00:00:30,000 --> 00:00:45,000
@@ -16,7 +16,7 @@ If evidence is missing, EnterpriseRAG explicitly states insufficient evidence.
 
 5
 00:01:00,000 --> 00:01:15,000
-Consolidated document comparison runs across multiple sources in under 5 seconds.
+Consolidated document comparison reduces model calls; CPU completion time varies.
 
 6
 00:01:15,000 --> 00:01:30,000
@@ -24,8 +24,8 @@ Video intelligence aligns Whisper transcripts with interactive playback timestam
 
 7
 00:01:30,000 --> 00:01:45,000
-Toggle seamlessly between Custom Hybrid Engine and LangChain LCEL workflows.
+Select the Custom Hybrid or LangChain LCEL engine through deployment configuration.
 
 8
 00:01:45,000 --> 00:02:00,000
-Featuring Evaluation Dashboards, Arabic support, and Hugging Face Docker Space readiness.
+Featuring measured-on-demand evaluation, Arabic support, and container deployment guidance.

@@ -45,20 +45,22 @@ export function FeedbackPage() {
         <div className="metric-card">
           <span className="metric-label">Helpful Rate</span>
           <strong className="metric-value">
-            {analytics ? `${(analytics.helpful_rate * 100).toFixed(0)}%` : "100%"}
+            {analytics && analytics.total_feedback > 0
+              ? `${(analytics.helpful_rate * 100).toFixed(0)}%`
+              : "No data"}
           </strong>
         </div>
         <div className="metric-card">
           <span className="metric-label">Total Submissions</span>
-          <strong className="metric-value">{analytics?.total_feedback ?? 1}</strong>
+          <strong className="metric-value">{analytics?.total_feedback ?? "—"}</strong>
         </div>
         <div className="metric-card">
           <span className="metric-label">Positive Feedback</span>
-          <strong className="metric-value">{analytics?.helpful_count ?? 1}</strong>
+          <strong className="metric-value">{analytics?.helpful_count ?? "—"}</strong>
         </div>
         <div className="metric-card">
           <span className="metric-label">Complaints Recorded</span>
-          <strong className="metric-value">{analytics?.unhelpful_count ?? 0}</strong>
+          <strong className="metric-value">{analytics?.unhelpful_count ?? "—"}</strong>
         </div>
       </div>
 

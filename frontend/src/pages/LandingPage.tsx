@@ -1,123 +1,139 @@
-import { useState } from "react";
 import {
   ArrowRight,
   Bot,
-  BrainCircuit,
-  CheckCircle,
+  FileCheck2,
   FileText,
-  Globe,
-  Layers,
-  Play,
-  ShieldCheck,
+  Github,
+  Globe2,
+  Headphones,
+  LockKeyhole,
+  MessageSquareQuote,
+  ShieldAlert,
   Sparkles,
-  Video,
 } from "lucide-react";
-import { seedDemoWorkspace } from "../api/client";
+
+const repository = "https://github.com/fariskishtah/enterprise-rag-platform";
 
 export function LandingPage() {
-  const [seeding, setSeeding] = useState(false);
-  const [seededNotice, setSeededNotice] = useState<string | null>(null);
-  const [seedError, setSeedError] = useState<string | null>(null);
-
-  async function handleSeedDemo() {
-    setSeeding(true);
-    setSeedError(null);
-    setSeededNotice(null);
-    try {
-      const res = await seedDemoWorkspace();
-      setSeededNotice(res.message);
-      setTimeout(() => {
-        window.location.href = `/chat?knowledgeBase=${res.knowledge_base_id}`;
-      }, 1200);
-    } catch (err) {
-      setSeedError(
-        err instanceof Error
-          ? err.message
-          : "The demo workspace could not be loaded. Please retry.",
-      );
-    } finally {
-      setSeeding(false);
-    }
-  }
-
   return (
-    <div className="landing-page">
-      {/* Hero Banner */}
-      <header className="landing-hero">
-        <div className="landing-hero-content">
-          <span className="eyebrow">Multimodal AI Platform</span>
-          <h1>Enterprise Knowledge Intelligence & Grounded QA</h1>
-          <p>
-            Zero-hallucination research across documents, scanned PDFs, audio, video, and web sources.
-            Built with local models, passage verification, and interactive timestamp citations.
-          </p>
+    <div className="public-page landing-page">
+      <nav className="public-nav" aria-label="Public navigation">
+        <a className="public-brand" href="/">
+          <Sparkles size={22} /> EnterpriseRAG
+        </a>
+        <div>
+          <a href="#workflow">How it works</a>
+          <a href="#limitations">Limitations</a>
+          <a className="button primary" href="/login">Try the demo</a>
+        </div>
+      </nav>
 
-          <div className="landing-cta-group">
-            <button
-              className="button primary large"
-              onClick={handleSeedDemo}
-              disabled={seeding}
-            >
-              <Sparkles size={18} />
-              {seeding ? "Loading Demo Workspace..." : "Load Demo Workspace"}
-            </button>
-            <a className="button secondary large" href="/chat">
-              <Play size={18} />
-              Launch Workspace
-            </a>
-            <a
-              className="button tertiary large"
-              href="https://github.com/fariskishtah/enterprise-rag-platform"
-              target="_blank"
-              rel="noreferrer"
-            >
-              GitHub Repository
-            </a>
+      <main>
+        <header className="landing-hero">
+          <div className="landing-hero-content">
+            <span className="eyebrow">Local-first multilingual knowledge intelligence</span>
+            <h1>Ask your sources. See the evidence.</h1>
+            <p>
+              Upload documents or media, ask grounded questions in Arabic or English,
+              and inspect citations, transcripts, summaries, and intelligence outputs—on
+              an architecture designed to run privately on your own infrastructure.
+            </p>
+            <div className="landing-cta-group">
+              <a className="button primary large" href="/login">
+                Try the demo <ArrowRight size={18} />
+              </a>
+              <a className="button secondary large" href={repository} target="_blank" rel="noreferrer">
+                <Github size={18} /> View GitHub
+              </a>
+              <a className="button tertiary large" href={`${repository}#readme`} target="_blank" rel="noreferrer">
+                Read documentation
+              </a>
+            </div>
           </div>
+          <aside className="hero-evidence" aria-label="Example grounded answer">
+            <span className="hero-evidence-label"><Bot size={16} /> Grounded answer</span>
+            <blockquote dir="rtl" lang="ar">تسمح السياسة بالعمل عن بُعد حتى ثلاثة أيام أسبوعياً.</blockquote>
+            <div><FileCheck2 size={17} /> Policy.pdf · page 4 · citation verified</div>
+          </aside>
+        </header>
 
-          {seededNotice && <div className="notice success">{seededNotice}</div>}
-          {seedError && <div className="notice error">{seedError}</div>}
-        </div>
-      </header>
+        <section className="demo-warning" aria-labelledby="demo-warning-title">
+          <ShieldAlert size={24} />
+          <div>
+            <h2 id="demo-warning-title">This is a public evaluation environment</h2>
+            <p>
+              Do not upload confidential, personal, or regulated information. Demo files
+              may be deleted automatically. AI output can be wrong—check every citation.
+              YouTube import is best-effort; direct MP3 or MP4 upload is more reliable.
+            </p>
+          </div>
+        </section>
 
-      {/* Feature Grid */}
-      <section className="landing-features">
-        <div className="feature-card">
-          <FileText className="feature-icon" />
-          <h3>Document Intelligence</h3>
-          <p>Extract, chunk, and index PDF, DOCX, and TXT files with sentence-boundary awareness and metadata preservation.</p>
-        </div>
+        <section className="landing-features" aria-label="Product capabilities">
+          <article className="feature-card">
+            <FileText className="feature-icon" />
+            <h2>Document intelligence</h2>
+            <p>Validate, extract, chunk, and search PDF, DOCX, and UTF-8 text sources.</p>
+          </article>
+          <article className="feature-card">
+            <MessageSquareQuote className="feature-icon" />
+            <h2>Grounded answers</h2>
+            <p>Trace responses to source passages, page references, and timestamp citations.</p>
+          </article>
+          <article className="feature-card">
+            <Globe2 className="feature-icon" />
+            <h2>Arabic and English</h2>
+            <p>Use multilingual retrieval, language-aware prompts, and right-to-left output.</p>
+          </article>
+          <article className="feature-card">
+            <Headphones className="feature-icon" />
+            <h2>Audio and video</h2>
+            <p>Transcribe direct media uploads, search timestamps, and generate local summaries.</p>
+          </article>
+          <article className="feature-card">
+            <Sparkles className="feature-icon" />
+            <h2>Intelligence tools</h2>
+            <p>Create evidence-based summaries, comparisons, reports, and media insights.</p>
+          </article>
+          <article className="feature-card">
+            <LockKeyhole className="feature-icon" />
+            <h2>Deploy it locally</h2>
+            <p>Run React, FastAPI, SQLite, Hugging Face models, and storage in your environment.</p>
+          </article>
+        </section>
 
-        <div className="feature-card">
-          <Video className="feature-icon" />
-          <h3>Video & Media Intelligence</h3>
-          <p>Automatic Whisper transcription, timestamp segment alignment, and synchronized video player jumping.</p>
-        </div>
+        <section className="workflow-section" id="workflow">
+          <span className="eyebrow">Simple workflow</span>
+          <h2>From source to supported answer</h2>
+          <ol className="workflow-grid">
+            <li><strong>01</strong><h3>Add knowledge</h3><p>Upload a supported document, MP3, or MP4.</p></li>
+            <li><strong>02</strong><h3>Process locally</h3><p>Extract text or transcribe speech, then build the retrieval index.</p></li>
+            <li><strong>03</strong><h3>Ask and inspect</h3><p>Review the answer, supporting passage, page, or timestamp.</p></li>
+          </ol>
+        </section>
 
-        <div className="feature-card">
-          <ShieldCheck className="feature-icon" />
-          <h3>Verifiable Citations</h3>
-          <p>Sentence-level claim verification checks every answer against source passages to guarantee zero hallucinations.</p>
-        </div>
+        <section className="limitations-section" id="limitations">
+          <div>
+            <span className="eyebrow">Honest constraints</span>
+            <h2>Designed for a focused CPU demo</h2>
+          </div>
+          <ul>
+            <li>CPU generation can take time and only one heavy request runs at once.</li>
+            <li>Public-demo storage, duration, request, and rate quotas apply.</li>
+            <li>Unsupported questions should return an insufficient-evidence response.</li>
+            <li>YouTube may reject cloud-hosted IP addresses; direct upload is the fallback.</li>
+          </ul>
+        </section>
+      </main>
 
-        <div className="feature-card">
-          <Globe className="feature-icon" />
-          <h3>Arabic & Multilingual QA</h3>
-          <p>First-class Modern Standard Arabic support, RTL interface rendering, and multilingual embedding search.</p>
-        </div>
-
-        <div className="feature-card">
-          <Layers className="feature-icon" />
-          <h3>Dual RAG Engines</h3>
-          <p>Switch dynamically between Custom Hybrid RAG (Dense + BM25 + Reranker) and LangChain/LCEL course engine.</p>
-        </div>
-
-        <div className="feature-card">
-          <BrainCircuit className="feature-icon" />
-          <h3>Evaluation & Feedback</h3>
-          <p>Integrated correctness, faithfulness, and latency dashboard with feedback analytics and case conversion.</p>
-        </div>
-      </section>
+      <footer className="public-footer">
+        <span>EnterpriseRAG public demo</span>
+        <a href={repository} target="_blank" rel="noreferrer">GitHub</a>
+        <a href={`${repository}#readme`} target="_blank" rel="noreferrer">Documentation</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms / demo notice</a>
+        <a href="/security">Security</a>
+      </footer>
     </div>
   );
 }

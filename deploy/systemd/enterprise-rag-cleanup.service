@@ -1,0 +1,11 @@
+[Unit]
+Description=Remove expired EnterpriseRAG public-demo data
+Requires=docker.service
+After=docker.service enterprise-rag.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=docker
+WorkingDirectory=/home/ubuntu/EnterpriseRAG
+ExecStart=/usr/bin/docker compose -f docker-compose.aws.yml exec -T app python3 /workspace/backend/scripts/cleanup_demo_data.py

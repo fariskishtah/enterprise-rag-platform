@@ -1,0 +1,12 @@
+[Unit]
+Description=Create and verify an EnterpriseRAG production backup
+Requires=docker.service
+After=docker.service enterprise-rag.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=docker
+WorkingDirectory=/home/ubuntu/EnterpriseRAG
+Environment=ENTERPRISE_RAG_BACKUP_DIR=/home/ubuntu/enterprise-rag-backups
+ExecStart=/home/ubuntu/EnterpriseRAG/scripts/backup-production.sh

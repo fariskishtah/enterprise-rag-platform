@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   deleteDocument,
@@ -30,6 +30,7 @@ const activeStatuses = new Set([
   "vector_indexing",
   "indexed",
 ]);
+const maximumStatusPolls = 180;
 
 export function DocumentPage({ documentId }: { documentId: string }) {
   const highlightedChunk = new URLSearchParams(window.location.search).get("chunk");
@@ -42,6 +43,11 @@ export function DocumentPage({ documentId }: { documentId: string }) {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const statusPolls = useRef(0);
+
+  useEffect(() => {
+    statusPolls.current = 0;
+  }, [documentId]);
 
   const load = useCallback(async () => {
     setError(null);
@@ -72,6 +78,14 @@ export function DocumentPage({ documentId }: { documentId: string }) {
   useEffect(() => {
     if (!document || !activeStatuses.has(document.status)) return;
     const interval = window.setInterval(() => {
+      statusPolls.current += 1;
+      if (statusPolls.current > maximumStatusPolls) {
+        window.clearInterval(interval);
+        setError(
+          "Document processing is taking longer than expected. Refresh later to check its status.",
+        );
+        return;
+      }
       getProcessingStatus(document.id)
         .then((current) => {
           setDocument(current);
@@ -90,7 +104,7 @@ export function DocumentPage({ documentId }: { documentId: string }) {
         });
     }, 1000);
     return () => window.clearInterval(interval);
-  }, [document, load]);
+  }, [document?.id, document?.status, load]);
 
   useEffect(() => {
     if (!highlightedChunk) return;

@@ -86,6 +86,35 @@ def test_rejects_extension_spoofing(client: TestClient, knowledge_base_id: str) 
     assert response.json()["error"]["code"] == "invalid_pdf"
 
 
+def test_rejects_unsupported_declared_mime_and_docx_compression_bomb(
+    client: TestClient,
+    knowledge_base_id: str,
+) -> None:
+    wrong_mime = client.post(
+        f"/api/v1/knowledge-bases/{knowledge_base_id}/documents",
+        files={"file": ("valid.pdf", b"%PDF-1.4\nvalid", "application/x-msdownload")},
+    )
+    assert wrong_mime.status_code == 415
+    assert wrong_mime.json()["error"]["code"] == "unsupported_document_media_type"
+
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", "<Types />")
+        archive.writestr("word/document.xml", "A" * (512 * 1024))
+    compressed_bomb = client.post(
+        f"/api/v1/knowledge-bases/{knowledge_base_id}/documents",
+        files={
+            "file": (
+                "bomb.docx",
+                output.getvalue(),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
+    )
+    assert compressed_bomb.status_code == 422
+    assert compressed_bomb.json()["error"]["code"] == "unsafe_docx_archive"
+
+
 def test_rejects_oversized_upload(tmp_path: Path) -> None:
     from app.core.config import Settings
     from app.main import create_app

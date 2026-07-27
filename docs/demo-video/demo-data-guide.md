@@ -1,11 +1,14 @@
-# Demo Data Guide
+# Demo data guide
 
-EnterpriseRAG includes an automated demo workspace seeder accessible via `POST /api/v1/demo/seed` or the UI button **Load Demo Workspace**.
+EnterpriseRAG includes an authenticated sample-workspace seeder at
+`POST /api/v1/demo/seed`. There is no landing-page seed button in the current release.
 
-## Included Fixture Sources
-1. **Employee Handbook PDF**: Standard corporate policy rules (remote work, PTO, expense limits).
-2. **Methodology Comparison TXT**: Two contrasting engineering approaches (acoustic vs thermal monitoring).
-3. **Scanned Inspection Report PDF**: Image-based PDF page exercising Tesseract OCR fallback.
-4. **Financial Summary DOCX**: Multi-column table document exercising `pdfplumber` table extraction.
-5. **Arabic Policy Document TXT**: Modern Standard Arabic policy for cross-lingual QA.
-6. **Video Recording Fixture**: Short MP4 lecture with Whisper timestamp alignment.
+The endpoint creates two clearly labeled UTF-8 TXT fixtures:
+
+1. `Employee_Handbook_2026.txt` — remote-work, expense, and PTO sample policy passages.
+2. `Arabic_Corporate_Policy.txt` — Arabic remote-work and leave sample passages.
+
+It stores the real fixture files, creates real chunks and embeddings with the configured
+embedding provider, and adds two unscored evaluation cases. It does not create fabricated
+evaluation runs, feedback, benchmark values, PDF/OCR/DOCX results, or media transcripts.
+The normal public-demo expiry policy applies to the seeded workspace.

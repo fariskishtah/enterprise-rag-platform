@@ -15,6 +15,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TypeVar
 
+from app.core.errors import GenerationQueueFullError
+
 logger = logging.getLogger(__name__)
 ResultT = TypeVar("ResultT")
 
@@ -26,6 +28,8 @@ class GenerationQueueStats:
     completed: int = 0
     timed_out: int = 0
     last_generation_finished: float | None = None
+    capacity: int = 1
+    queue_capacity: int = 2
 
 
 class GenerationQueue:
@@ -33,14 +37,20 @@ class GenerationQueue:
 
     Usage::
 
-        async with generation_queue.acquire(timeout=45):
+        async with await generation_queue.acquire(timeout=45):
             result = await asyncio.to_thread(model.generate, prompt)
     """
 
-    def __init__(self, max_concurrent: int = 1, queue_timeout: float = 120.0) -> None:
+    def __init__(
+        self,
+        max_concurrent: int = 1,
+        queue_timeout: float = 120.0,
+        max_queue_size: int = 2,
+    ) -> None:
         self._semaphore = asyncio.Semaphore(max_concurrent)
         self._max_concurrent = max_concurrent
         self._queue_timeout = queue_timeout
+        self._max_queue_size = max_queue_size
         self._active = 0
         self._queued = 0
         self._completed = 0
@@ -56,6 +66,8 @@ class GenerationQueue:
             completed=self._completed,
             timed_out=self._timed_out,
             last_generation_finished=self._last_finished,
+            capacity=self._max_concurrent,
+            queue_capacity=self._max_queue_size,
         )
 
     class _Slot:
@@ -82,13 +94,18 @@ class GenerationQueue:
         queue timeout) elapses before a slot becomes available.
         """
         effective_timeout = timeout if timeout is not None else self._queue_timeout
+        if self._semaphore.locked() and self._queued >= self._max_queue_size:
+            raise GenerationQueueFullError(
+                "The server is busy and its bounded model queue is full. Please retry shortly."
+            )
         self._queued += 1
         try:
             await asyncio.wait_for(self._semaphore.acquire(), timeout=effective_timeout)
-        except TimeoutError:
+        except BaseException as exc:
             self._queued = max(0, self._queued - 1)
-            self._timed_out += 1
-            logger.warning("Generation queue wait timed out after %.1fs", effective_timeout)
+            if isinstance(exc, TimeoutError):
+                self._timed_out += 1
+                logger.warning("Generation queue wait timed out after %.1fs", effective_timeout)
             raise
         return self._Slot(self)
 

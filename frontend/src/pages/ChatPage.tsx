@@ -94,7 +94,9 @@ export function ChatPage() {
   const [debug, setDebug] = useState(false);
   const [responseMode, setResponseMode] = useState<"concise" | "detailed">("concise");
   const [outputLanguage, setOutputLanguage] = useState<OutputLanguage>("auto");
-  const [modelStatus, setModelStatus] = useState<"cold" | "loading" | "ready" | "failed">(
+  const [modelStatus, setModelStatus] = useState<
+    "cold" | "loading" | "ready" | "busy" | "failed"
+  >(
     "cold",
   );
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -275,6 +277,7 @@ export function ChatPage() {
           <label>
             <span>Searching</span>
             <select
+              aria-label="Knowledge base"
               value={knowledgeBaseId}
               onChange={(event) => setKnowledgeBaseId(event.target.value)}
               disabled={asking}

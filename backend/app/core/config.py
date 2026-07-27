@@ -9,6 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 RuntimeProfile = Literal["low_memory", "balanced", "quality", "aws_cpu", "huggingface_demo"]
 LanguageMode = Literal["auto", "ar", "en"]
+AccessMode = Literal["open", "demo_password", "accounts"]
 
 
 class Settings(BaseSettings):
@@ -30,13 +31,35 @@ class Settings(BaseSettings):
     app_version: str = "0.5.0"
     api_prefix: str = "/api/v1"
     environment: str = "development"
+    git_commit: str | None = None
+
+    # Public-demo access control. Local development stays open by default; the
+    # tracked AWS profile explicitly selects demo_password.
+    access_mode: AccessMode = "open"
+    demo_password_hash: str | None = None
+    session_secret: str = "development-only-change-me"
+    session_expiry_minutes: int = Field(default=120, ge=1, le=10080)
+    cookie_secure: bool = False
+    session_cookie_name: str = "enterprise_rag_session"
+    login_max_attempts: int = Field(default=5, ge=2, le=20)
+    login_lockout_minutes: int = Field(default=15, ge=1, le=1440)
     database_url: str = "sqlite:///./data/enterprise_rag.db"
     storage_path: Path = Path("data/uploads")
     model_cache_path: Path = Path("data/models")
     langchain_index_path: Path = Path("data/langchain_indexes")
-    max_upload_bytes: int = Field(default=15 * 1024 * 1024, gt=0)
-    max_media_upload_bytes: int = Field(default=500 * 1024 * 1024, gt=0)
-    max_media_duration_seconds: int = Field(default=4 * 60 * 60, ge=1)
+    max_upload_mb: int = Field(default=50, ge=1, le=1024)
+    max_upload_bytes: int = Field(default=50 * 1024 * 1024, gt=0)
+    max_media_upload_bytes: int = Field(default=50 * 1024 * 1024, gt=0)
+    max_document_pages: int = Field(default=300, ge=1, le=5000)
+    max_media_duration_minutes: int = Field(default=30, ge=1, le=1440)
+    max_media_duration_seconds: int = Field(default=30 * 60, ge=1)
+    max_files_per_knowledge_base: int = Field(default=25, ge=1, le=10000)
+    max_knowledge_bases: int = Field(default=5, ge=1, le=10000)
+    max_concurrent_uploads: int = Field(default=2, ge=1, le=32)
+    max_concurrent_heavy_operations: int = Field(default=1, ge=1, le=8)
+    request_body_limit_mb: int = Field(default=55, ge=1, le=2048)
+    temp_file_retention_hours: int = Field(default=12, ge=1, le=720)
+    demo_data_retention_hours: int = Field(default=24, ge=0, le=8760)
     media_download_timeout_seconds: int = Field(default=120, ge=5, le=3600)
     media_processing_timeout_seconds: int = Field(default=1800, ge=30, le=7200)
     ytdlp_cookies_file: Path | None = None
@@ -117,6 +140,7 @@ class Settings(BaseSettings):
 
     # ── Concurrency & timeouts ───────────────────────────────────────────
     max_concurrent_generations: int = Field(default=2, ge=1, le=8)
+    heavy_queue_max_size: int = Field(default=2, ge=0, le=32)
     generation_timeout_seconds: int = Field(default=90, ge=5, le=600)
     generation_queue_timeout_seconds: int = Field(default=120, ge=5, le=600)
     model_load_timeout_seconds: int = Field(default=120, ge=10, le=600)
@@ -138,9 +162,21 @@ class Settings(BaseSettings):
     langchain_force_wrapper: bool = False
     warm_models_on_startup: bool = False
     warm_generation_model_on_startup: bool = True
+    unload_transcription_model_after_use: bool = False
     torch_num_threads: int = Field(default=2, ge=1, le=16)
     torch_num_interop_threads: int = Field(default=1, ge=1, le=8)
+    tokenizer_parallelism: bool = False
     query_embedding_cache_size: int = Field(default=128, ge=0, le=2048)
+
+    # Small in-process limiters are intentionally used instead of a monitoring
+    # stack or external cache on the 4 GB demo host.
+    upload_rate_limit_per_minute: int = Field(default=10, ge=1, le=10000)
+    generation_rate_limit_per_minute: int = Field(default=12, ge=1, le=10000)
+    transcription_rate_limit_per_minute: int = Field(default=6, ge=1, le=10000)
+    url_import_rate_limit_per_minute: int = Field(default=6, ge=1, le=10000)
+
+    backup_dir: Path = Path("backups")
+    backup_retention_days: int = Field(default=7, ge=1, le=3650)
 
     @field_validator("generation_quantization", mode="before")
     @classmethod
@@ -164,6 +200,32 @@ class Settings(BaseSettings):
         )
         if weight_total <= 0:
             raise ValueError("At least one retrieval score weight must be positive")
+        if (
+            "max_upload_mb" in self.model_fields_set
+            and "max_upload_bytes" not in self.model_fields_set
+        ):
+            object.__setattr__(self, "max_upload_bytes", self.max_upload_mb * 1024 * 1024)
+        if (
+            "max_media_duration_minutes" in self.model_fields_set
+            and "max_media_duration_seconds" not in self.model_fields_set
+        ):
+            object.__setattr__(
+                self,
+                "max_media_duration_seconds",
+                self.max_media_duration_minutes * 60,
+            )
+        production_environment = self.environment.lower() in {"production", "aws"}
+        if production_environment and "access_mode" not in self.model_fields_set:
+            object.__setattr__(self, "access_mode", "demo_password")
+        if production_environment and self.access_mode != "open":
+            if self.session_secret == "development-only-change-me" or len(self.session_secret) < 32:
+                raise ValueError("Production access control requires a strong session secret")
+            if self.access_mode == "demo_password" and (
+                not self.demo_password_hash
+                or len(self.demo_password_hash) != 60
+                or not self.demo_password_hash.startswith(("$2a$", "$2b$", "$2y$"))
+            ):
+                raise ValueError("Demo-password mode requires a valid bcrypt password hash")
         return self
 
     @model_validator(mode="after")
@@ -204,6 +266,8 @@ class Settings(BaseSettings):
             _apply_if_default(self, "transcription_model_name", "base", "small")
             _apply_if_default(self, "transcription_cpu_threads", 2, 4)
             _apply_if_default(self, "embedding_batch_size", 8, 32)
+            _apply_if_default(self, "unload_transcription_model_after_use", True, False)
+            _apply_if_default(self, "warm_generation_model_on_startup", False, True)
             _apply_if_default(self, "langchain_parser_retries", 0, 1)
             _apply_if_default(self, "langchain_force_wrapper", True, False)
             object.__setattr__(self, "model_device", "cpu")

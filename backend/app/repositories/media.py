@@ -8,6 +8,7 @@ from app.models.media import (
     MediaSummary,
     TranscriptSegment,
 )
+from app.services.lifecycle import mark_accessed
 
 
 class MediaRepository:
@@ -15,7 +16,11 @@ class MediaRepository:
         self.session = session
 
     def get(self, media_source_id: str) -> MediaSource | None:
-        return self.session.get(MediaSource, media_source_id)
+        value = self.session.get(MediaSource, media_source_id)
+        if value is not None:
+            mark_accessed(value)
+            self.session.commit()
+        return value
 
     def add(self, media_source: MediaSource) -> MediaSource:
         self.session.add(media_source)
@@ -29,7 +34,12 @@ class MediaRepository:
             .where(MediaSource.knowledge_base_id == knowledge_base_id)
             .order_by(MediaSource.created_at.desc())
         )
-        return list(self.session.scalars(statement).all())
+        values = list(self.session.scalars(statement).all())
+        for value in values:
+            mark_accessed(value)
+        if values:
+            self.session.commit()
+        return values
 
     def find_by_checksum(self, knowledge_base_id: str, checksum_sha256: str) -> MediaSource | None:
         return self.session.scalar(

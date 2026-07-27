@@ -10,6 +10,32 @@ interface BrowserDiagnostics {
   apiRequests: string[];
 }
 
+async function ensureWorkspaceAccess(page: Page) {
+  const configuration = await page.request.get("/api/v1/auth/config");
+  expect(configuration.status()).toBe(200);
+  const { mode } = (await configuration.json()) as { mode: string };
+  if (mode === "open") return;
+
+  const sessionResponse = await page.request.get("/api/v1/auth/session");
+  expect(sessionResponse.status()).toBe(200);
+  const session = (await sessionResponse.json()) as { authenticated: boolean };
+  if (session.authenticated) return;
+
+  if (mode !== "demo_password") {
+    throw new Error("Production smoke requires an existing session in accounts mode.");
+  }
+  const password = process.env.PLAYWRIGHT_DEMO_PASSWORD;
+  if (!password) {
+    throw new Error(
+      "Set PLAYWRIGHT_DEMO_PASSWORD to run protected production smoke journeys.",
+    );
+  }
+  const login = await page.request.post("/api/v1/auth/demo/login", {
+    data: { password },
+  });
+  expect(login.status(), "demo-password authentication should succeed").toBe(200);
+}
+
 function collectDiagnostics(
   page: Page,
   expectedApiFailures: string[] = [],
@@ -71,10 +97,14 @@ test.describe("production container smoke", () => {
     page,
   }) => {
     const diagnostics = collectDiagnostics(page, ["/documents/smoke-missing", "/media/smoke-missing"]);
+    await ensureWorkspaceAccess(page);
     const routes = [
       "/",
       "/landing",
       "/login",
+      "/privacy",
+      "/terms",
+      "/security",
       "/dashboard",
       "/workspace",
       "/knowledge-bases",
@@ -112,6 +142,14 @@ test.describe("production container smoke", () => {
       expect(response.status()).toBe(200);
     }
 
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/", { waitUntil: "networkidle" });
+    await expect(page.getByRole("link", { name: /Try the demo/ }).first()).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+      "mobile landing should not overflow horizontally",
+    ).toBe(true);
+
     expect(diagnostics.apiRequests.length).toBeGreaterThan(0);
     for (const requestUrl of diagnostics.apiRequests) {
       const url = new URL(requestUrl);
@@ -125,12 +163,12 @@ test.describe("production container smoke", () => {
     page,
   }) => {
     const diagnostics = collectDiagnostics(page);
-    await page.goto("/", { waitUntil: "networkidle" });
+    await ensureWorkspaceAccess(page);
+    await page.goto("/dashboard", { waitUntil: "networkidle" });
     await expect(page.getByRole("heading", { name: /Your knowledge/ })).toBeVisible();
 
     const destinations = [
-      ["Product Showcase", "/landing", "Enterprise Knowledge Intelligence & Grounded QA"],
-      ["Overview", "/", /Your knowledge/],
+      ["Overview", "/dashboard", /Your knowledge/],
       ["Knowledge", "/knowledge-bases", "Knowledge bases"],
       [
         "Source library",
@@ -144,6 +182,7 @@ test.describe("production container smoke", () => {
       ["Feedback", "/feedback", "Feedback Analytics"],
       ["Templates", "/templates", "Action Template Library"],
       ["Settings", "/settings", "Model settings"],
+      ["Product Showcase", "/", "Ask your sources. See the evidence."],
     ] as const;
 
     for (const [title, path, heading] of destinations) {
@@ -157,32 +196,30 @@ test.describe("production container smoke", () => {
       ).toBeVisible();
     }
 
-    await page.goto("/landing");
-    await page.getByRole("link", { name: "Launch Workspace" }).click();
-    await expect(page).toHaveURL(/\/chat\/?$/);
-
-    await page.goto("/");
+    await page.goto("/dashboard");
     await page
       .getByRole("main")
       .getByRole("link", { name: "Add knowledge", exact: true })
       .click();
     await expect(page).toHaveURL(/\/upload\/?$/);
-    await page.goto("/");
+    await page.goto("/dashboard");
     await page.getByRole("main").getByRole("link", { name: "Ask a question" }).click();
     await expect(page).toHaveURL(/\/chat\/?$/);
 
-    await page.goto("/login");
-    await page.getByRole("button", { name: /Need an account/ }).click();
-    await expect(page.getByRole("heading", { name: "Create Account" })).toBeVisible();
-    await page.getByRole("button", { name: /Already have an account/ }).click();
-    await expect(page.getByRole("heading", { name: "Enterprise Authentication" })).toBeVisible();
+    await page.goto("/dashboard");
+    await page.getByTitle("Sign out").click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(
+      page.getByRole("heading", { name: "Ask your sources. See the evidence." }),
+    ).toBeVisible();
     expectCleanDiagnostics(diagnostics);
   });
 
   test("primary async actions terminate on both success and failure", async ({ page }) => {
-    const diagnostics = collectDiagnostics(page, ["/documents", "/auth/login", "/demo/seed"]);
+    const diagnostics = collectDiagnostics(page, ["/documents", "/auth/demo/login"]);
     const workspaceName = `Production smoke ${Date.now()}`;
 
+    await ensureWorkspaceAccess(page);
     await page.goto("/knowledge-bases");
     await page.getByLabel("Name").fill(workspaceName);
     await page.getByLabel(/Description/).fill("Production navigation validation");
@@ -259,38 +296,36 @@ test.describe("production container smoke", () => {
     await composer.fill("A follow-up remains usable.");
     await expect(page.getByLabel("Ask sources")).toBeEnabled();
 
-    await page.route("**/api/v1/auth/login", (route) =>
+    await page.route("**/api/v1/auth/config", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ mode: "demo_password", session_expiry_minutes: 60 }),
+      }),
+    );
+    await page.route("**/api/v1/auth/session", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ mode: "demo_password", authenticated: false }),
+      }),
+    );
+    await page.route("**/api/v1/auth/demo/login", (route) =>
       route.fulfill({
         status: 401,
         contentType: "application/json",
         body: JSON.stringify({
-          error: { code: "invalid_credentials", message: "Incorrect email or password." },
+          error: { code: "invalid_credentials", message: "The sign-in details are invalid." },
         }),
       }),
     );
     await page.goto("/login");
-    await page.getByLabel("Email Address").fill("smoke@example.com");
-    await page.getByLabel("Password").fill("invalid-password");
-    await page.getByRole("button", { name: "Sign In" }).click();
-    await expect(page.getByText("Incorrect email or password.")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Sign In" })).toBeEnabled();
+    await page.getByLabel("Demo password").fill("invalid-password");
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.getByText("The sign-in details are invalid.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign in" })).toBeEnabled();
     expect(await page.evaluate(() => localStorage.getItem("token"))).toBeNull();
     await expect(page).toHaveURL(/\/login\/?$/);
-
-    await page.route("**/api/v1/demo/seed", (route) =>
-      route.fulfill({
-        status: 503,
-        contentType: "application/json",
-        body: JSON.stringify({
-          error: { code: "seed_unavailable", message: "Demo seed is unavailable." },
-        }),
-      }),
-    );
-    await page.goto("/landing");
-    await page.getByRole("button", { name: "Load Demo Workspace" }).click();
-    await expect(page.getByText("Demo seed is unavailable.")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Load Demo Workspace" })).toBeEnabled();
-    await expect(page).toHaveURL(/\/landing\/?$/);
 
     expectCleanDiagnostics(diagnostics);
   });
@@ -299,6 +334,7 @@ test.describe("production container smoke", () => {
     page,
   }) => {
     const diagnostics = collectDiagnostics(page);
+    await ensureWorkspaceAccess(page);
     const workspace = await page.request.post("/api/v1/knowledge-bases", {
       data: {
         name: `Arabic production smoke ${Date.now()}`,

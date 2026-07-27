@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_db_session
@@ -15,20 +15,20 @@ router = APIRouter(prefix="/feedback", tags=["feedback"])
 
 
 class FeedbackSubmitRequest(BaseModel):
-    knowledge_base_id: str
-    question: str
-    answer: str
-    rating: str  # helpful, unhelpful
-    category: str = "other"
-    comment: str | None = None
-    chat_message_id: str | None = None
-    engine: str = "custom"
-    model_name: str = "Qwen"
-    latency_ms: float = 0.0
+    knowledge_base_id: str = Field(min_length=1, max_length=36)
+    question: str = Field(min_length=2, max_length=4000)
+    answer: str = Field(min_length=1, max_length=12000)
+    rating: Literal["helpful", "unhelpful"]
+    category: str = Field(default="other", min_length=1, max_length=64)
+    comment: str | None = Field(default=None, max_length=2000)
+    chat_message_id: str | None = Field(default=None, max_length=36)
+    engine: str = Field(default="custom", min_length=1, max_length=64)
+    model_name: str = Field(default="Qwen", min_length=1, max_length=255)
+    latency_ms: float = Field(default=0.0, ge=0.0, le=86_400_000)
 
 
 class ConvertFeedbackRequest(BaseModel):
-    dataset_id: str
+    dataset_id: str = Field(min_length=1, max_length=36)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

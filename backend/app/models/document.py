@@ -17,7 +17,7 @@ from sqlalchemy import (
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import Base, DemoLifecycleMixin, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.knowledge_base import KnowledgeBase
@@ -44,7 +44,7 @@ class DocumentStatus(StrEnum):
     FAILED = "failed"
 
 
-class Document(TimestampMixin, Base):
+class Document(DemoLifecycleMixin, TimestampMixin, Base):
     __tablename__ = "documents"
     __table_args__ = (
         Index("ix_documents_knowledge_base_status", "knowledge_base_id", "status"),

@@ -5,6 +5,9 @@ export interface KnowledgeBase {
   document_count: number;
   created_at: string;
   updated_at: string;
+  last_accessed_at: string;
+  expires_at: string | null;
+  is_protected: boolean;
 }
 
 export interface KnowledgeBaseList {
@@ -51,6 +54,9 @@ export interface DocumentRecord {
   indexing_completed_at: string | null;
   created_at: string;
   updated_at: string;
+  last_accessed_at: string;
+  expires_at: string | null;
+  is_protected: boolean;
 }
 
 export interface DocumentList {
@@ -295,9 +301,9 @@ export interface RagConfiguration {
   embedding_model_cached: boolean;
   generation_model_cached: boolean;
   model_warm: boolean;
-  embedding_model_status: "cold" | "loading" | "ready" | "failed";
-  generation_model_status: "cold" | "loading" | "ready" | "failed";
-  warmup_status: "cold" | "loading" | "ready" | "failed";
+  embedding_model_status: "cold" | "loading" | "ready" | "busy" | "failed";
+  generation_model_status: "cold" | "loading" | "ready" | "busy" | "failed";
+  warmup_status: "cold" | "loading" | "ready" | "busy" | "failed";
   vector_store: string;
   top_k: number;
   candidate_pool: number;
@@ -319,6 +325,14 @@ export interface RagConfiguration {
   generation_queue_queued?: number;
   generation_timeout_seconds?: number;
   embedding_reindex_required: boolean;
+  maximum_upload_mb: number;
+  maximum_document_pages: number;
+  maximum_media_duration_minutes: number;
+  maximum_files_per_knowledge_base: number;
+  maximum_knowledge_bases: number;
+  maximum_concurrent_heavy_operations: number;
+  heavy_queue_max_size: number;
+  demo_data_retention_hours: number;
 }
 
 export type MediaStatus =
@@ -365,6 +379,9 @@ export interface MediaSource {
   ingestion_date: string | null;
   created_at: string;
   updated_at: string;
+  last_accessed_at: string;
+  expires_at: string | null;
+  is_protected: boolean;
 }
 
 export interface MediaList {

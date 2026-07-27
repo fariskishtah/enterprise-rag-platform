@@ -167,6 +167,8 @@ def rag_configuration(
     }
     embedding_status = str(getattr(embedding_provider, "load_status", "cold"))
     generation_status = str(getattr(generation_provider, "load_status", "cold"))
+    if queue_stats.active:
+        generation_status = "busy"
     models_ready = embedding_status == "ready" and generation_status == "ready"
     warmup_status = "ready" if models_ready else request.app.state.model_warmup.status
     return RagConfigurationRead(
@@ -217,7 +219,37 @@ def rag_configuration(
         embedding_reindex_required=bool(
             indexed_models - {settings.embedding_model_name}
         ),
+        maximum_upload_mb=settings.max_upload_bytes // (1024 * 1024),
+        maximum_document_pages=settings.max_document_pages,
+        maximum_media_duration_minutes=settings.max_media_duration_seconds // 60,
+        maximum_files_per_knowledge_base=settings.max_files_per_knowledge_base,
+        maximum_knowledge_bases=settings.max_knowledge_bases,
+        maximum_concurrent_heavy_operations=settings.max_concurrent_heavy_operations,
+        heavy_queue_max_size=settings.heavy_queue_max_size,
+        demo_data_retention_hours=settings.demo_data_retention_hours,
     )
+
+
+async def _run_model_warmup(
+    request: Request,
+    settings: Settings,
+    embedding_provider: EmbeddingProvider,
+    generation_provider: GenerationProvider,
+) -> None:
+    controller = request.app.state.model_warmup
+    try:
+        slot = await request.app.state.generation_queue.acquire()
+        await request.app.state.generation_queue.execute(
+            slot,
+            lambda: controller.run(
+                embedding_provider,
+                generation_provider,
+                settings,
+            ),
+            timeout=settings.model_load_timeout_seconds + settings.generation_timeout_seconds,
+        )
+    except Exception:
+        controller.fail()
 
 
 @router.post("/rag/warmup", status_code=status.HTTP_202_ACCEPTED)
@@ -231,10 +263,11 @@ def warm_models(
     controller = request.app.state.model_warmup
     if controller.begin():
         background_tasks.add_task(
-            controller.run,
+            _run_model_warmup,
+            request,
+            settings,
             embedding_provider,
             generation_provider,
-            settings,
         )
     return {"status": controller.status}
 

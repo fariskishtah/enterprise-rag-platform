@@ -1,0 +1,11 @@
+[Unit]
+Description=Back up EnterpriseRAG every day
+
+[Timer]
+OnCalendar=*-*-* 02:15:00 UTC
+Persistent=true
+RandomizedDelaySec=15m
+Unit=enterprise-rag-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -223,17 +223,13 @@ def test_media_validation_duplicate_private_url_corruption_and_no_speech(
     assert private_url.status_code == 422
     assert private_url.json()["error"]["code"] == "private_media_url"
 
-    corrupt = upload_media(
-        client,
-        knowledge_base_id,
-        filename="corrupt.mp4",
-        content=b"not-a-video",
+    corrupt = client.post(
+        f"/api/v1/knowledge-bases/{knowledge_base_id}/media",
+        data={"auto_process": "false"},
+        files={"file": ("corrupt.mp4", b"not-a-video", "video/mp4")},
     )
-    client.post(f"/api/v1/media/{corrupt['id']}/process")
-    corrupt_status = client.get(f"/api/v1/media/{corrupt['id']}").json()
-    assert corrupt_status["status"] == "failed"
-    assert corrupt_status["error_code"] == "invalid_or_corrupt_media"
-    assert corrupt_status["retryable"] is True
+    assert corrupt.status_code == 422
+    assert corrupt.json()["error"]["code"] == "invalid_media_signature"
 
     client.app.state.transcription_provider = NoSpeechTranscriptionProvider()
     silent = upload_media(
@@ -355,6 +351,22 @@ def test_faster_whisper_uses_cpu_bounded_beam_vad_and_transcription_task(
         "condition_on_previous_text": True,
     }
     assert result.segments[0].text == "نص عربي، مع علامات الترقيم."
+
+
+def test_faster_whisper_model_can_be_unloaded_after_aws_job(tmp_path: Path) -> None:
+    provider = FasterWhisperTranscriptionProvider(
+        model_name="base",
+        cache_path=tmp_path / "whisper-unload",
+        device="cpu",
+        compute_type="int8",
+        cpu_threads=2,
+    )
+    key = provider._cache_key()
+    provider._models[key] = object()
+
+    assert provider.load_status == "ready"
+    assert provider.unload() is True
+    assert provider.load_status == "cold"
 
 
 def test_ytdlp_cookie_file_is_optional_readable_and_never_returned_by_api(

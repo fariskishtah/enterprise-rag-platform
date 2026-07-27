@@ -82,6 +82,7 @@ async function fetchWithTimeout(
     return await fetch(`${API_BASE_URL}${path}`, {
       ...options,
       headers,
+      credentials: "same-origin",
       signal: controller.signal,
     });
   } catch (error) {
@@ -118,11 +119,16 @@ async function responseError(response: Response): Promise<ApiError> {
   } catch {
     // A proxy or network edge may return a non-JSON failure response.
   }
-  return new ApiError(
+  const error = new ApiError(
     payload.error?.message ?? payload.detail ?? "The request could not be completed.",
     response.status,
     payload.error?.code ?? "request_failed",
   );
+  if (response.status === 401) {
+    window.localStorage.removeItem("token");
+    window.dispatchEvent(new CustomEvent("enterprise-rag:unauthorized"));
+  }
+  return error;
 }
 
 async function request<T>(
@@ -586,4 +592,36 @@ export function loginUser(input: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
+}
+
+export interface AccessConfiguration {
+  mode: "open" | "demo_password" | "accounts";
+  session_expiry_minutes: number;
+}
+
+export interface AuthSession {
+  mode: AccessConfiguration["mode"];
+  authenticated: boolean;
+  expires_at: number | null;
+  role: string | null;
+}
+
+export function getAccessConfiguration(): Promise<AccessConfiguration> {
+  return request("/auth/config");
+}
+
+export function getAuthSession(): Promise<AuthSession> {
+  return request("/auth/session");
+}
+
+export function loginDemo(password: string): Promise<AuthSession> {
+  return request("/auth/demo/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+}
+
+export function logoutSession(): Promise<void> {
+  return requestVoid("/auth/logout", { method: "POST" });
 }

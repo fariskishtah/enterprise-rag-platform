@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import hashlib
 import math
 import re
@@ -84,6 +85,17 @@ class FasterWhisperTranscriptionProvider(TranscriptionProvider):
     def load_status(self) -> str:
         key = self._cache_key()
         return "ready" if key in self._models else self._states.get(key, "cold")
+
+    def unload(self) -> bool:
+        """Release this CPU model after use on constrained production profiles."""
+
+        key = self._cache_key()
+        with self._lock:
+            removed = self._models.pop(key, None) is not None
+            self._states[key] = "cold"
+        if removed:
+            gc.collect()
+        return removed
 
     def _load_model(self) -> Any:
         key = self._cache_key()

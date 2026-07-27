@@ -8,7 +8,12 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.evaluation import EvaluationCase, EvaluationDataset
+from app.core.errors import AppError
+from app.models.evaluation import (
+    MAX_EVALUATION_CASES_PER_DATASET,
+    EvaluationCase,
+    EvaluationDataset,
+)
 from app.models.feedback import UserFeedback
 
 logger = logging.getLogger(__name__)
@@ -59,7 +64,7 @@ class FeedbackService:
         )
         unhelpful = total - helpful
 
-        helpful_rate = round(helpful / total, 2) if total > 0 else 1.0
+        helpful_rate = round(helpful / total, 2) if total > 0 else 0.0
 
         # Complaint categories count
         categories_query = (
@@ -86,6 +91,12 @@ class FeedbackService:
         )
         if feedback is None or dataset is None:
             return None
+        if dataset.case_count >= MAX_EVALUATION_CASES_PER_DATASET:
+            raise AppError(
+                status_code=422,
+                code="evaluation_case_quota_exceeded",
+                message="This evaluation dataset has reached the public-demo case limit.",
+            )
 
         case = EvaluationCase(
             dataset_id=dataset_id,

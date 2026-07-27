@@ -18,7 +18,7 @@ from sqlalchemy import (
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import Base, DemoLifecycleMixin, TimestampMixin
 
 
 class MediaSourceKind(StrEnum):
@@ -50,7 +50,7 @@ class TranscriptJobStatus(StrEnum):
     FAILED = "failed"
 
 
-class MediaSource(TimestampMixin, Base):
+class MediaSource(DemoLifecycleMixin, TimestampMixin, Base):
     __tablename__ = "media_sources"
     __table_args__ = (
         Index("ix_media_sources_kb_status", "knowledge_base_id", "status"),

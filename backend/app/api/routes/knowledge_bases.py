@@ -1,13 +1,16 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_db_session
-from app.core.errors import NotFoundError
+from app.api.dependencies import get_db_session, get_runtime_settings
+from app.core.config import Settings
+from app.core.errors import NotFoundError, UploadValidationError
 from app.models.knowledge_base import KnowledgeBase
 from app.repositories.knowledge_bases import KnowledgeBaseRepository
 from app.schemas.knowledge_base import KnowledgeBaseCreate, KnowledgeBaseList, KnowledgeBaseRead
+from app.services.lifecycle import demo_expiry
 
 router = APIRouter(prefix="/knowledge-bases", tags=["knowledge bases"])
 
@@ -20,6 +23,9 @@ def to_read_model(knowledge_base: KnowledgeBase, document_count: int) -> Knowled
         document_count=document_count,
         created_at=knowledge_base.created_at,
         updated_at=knowledge_base.updated_at,
+        last_accessed_at=knowledge_base.last_accessed_at,
+        expires_at=knowledge_base.expires_at,
+        is_protected=knowledge_base.is_protected,
     )
 
 
@@ -27,9 +33,23 @@ def to_read_model(knowledge_base: KnowledgeBase, document_count: int) -> Knowled
 def create_knowledge_base(
     payload: KnowledgeBaseCreate,
     session: Annotated[Session, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_runtime_settings)],
 ) -> KnowledgeBaseRead:
+    existing_count = session.scalar(select(func.count(KnowledgeBase.id))) or 0
+    if existing_count >= settings.max_knowledge_bases:
+        raise UploadValidationError(
+            code="knowledge_base_quota_exceeded",
+            message=(
+                "The public demo knowledge-base limit has been reached. "
+                "Remove an existing knowledge base before creating another."
+            ),
+        )
     repository = KnowledgeBaseRepository(session)
-    knowledge_base = repository.create(name=payload.name, description=payload.description)
+    knowledge_base = repository.create(
+        name=payload.name,
+        description=payload.description,
+        expires_at=demo_expiry(settings.demo_data_retention_hours),
+    )
     return to_read_model(knowledge_base, 0)
 
 
