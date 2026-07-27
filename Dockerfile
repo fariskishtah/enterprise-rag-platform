@@ -10,8 +10,15 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
+# yt-dlp recommends Deno >=2.3 for YouTube's external JavaScript challenges.
+# The official bin image is multi-architecture and contributes only the runtime binary.
+FROM denoland/deno:bin-2.9.4 AS deno-runtime
+
 # Stage 2: Python Backend Runtime
 FROM python:3.11-slim AS runtime
+
+COPY --from=deno-runtime /deno /usr/local/bin/deno
+RUN deno --version
 
 # Install system dependencies (ffmpeg for media, poppler for PDF images, tesseract for OCR)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -49,6 +56,7 @@ ENV APP_RUNTIME_PROFILE=huggingface_demo \
     PYTHONUNBUFFERED=1 \
     CUDA_VISIBLE_DEVICES="" \
     TOKENIZERS_PARALLELISM=false \
+    DENO_DIR=/tmp/enterprise-rag/deno-cache \
     PORT=7860 \
     ENTERPRISE_RAG_DATABASE_URL=sqlite:////tmp/enterprise_rag.db \
     ENTERPRISE_RAG_STORAGE_PATH=/tmp/uploads \

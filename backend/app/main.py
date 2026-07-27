@@ -35,6 +35,7 @@ from app.media.transcription import (
     TranscriptionProvider,
 )
 from app.models import Document, KnowledgeBase  # noqa: F401
+from app.services.media import prepare_runtime_ytdlp_cookie
 from app.services.storage import LocalFileStorage
 
 
@@ -56,6 +57,8 @@ def create_app(
         nonlocal warmup_task
         runtime_settings.storage_path.mkdir(parents=True, exist_ok=True)
         Base.metadata.create_all(engine)
+        with suppress(ProcessingError):
+            prepare_runtime_ytdlp_cookie(runtime_settings.ytdlp_cookies_file)
         if runtime_settings.warm_models_on_startup and warmup_controller.begin():
             warmup_task = asyncio.create_task(
                 asyncio.to_thread(

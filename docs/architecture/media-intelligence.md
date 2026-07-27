@@ -51,6 +51,10 @@ flowchart TD
   be forced before transcription. The task is always transcription, never implicit translation.
 - **Bounded CPU Work**: VAD, beam size, worker count, and CPU threads are bounded. The AWS
   profile recommends `base`; `small` remains available for higher Arabic accuracy.
-- **Optional YouTube Cookies**: yt-dlp receives a readable configured Netscape cookie file
-  through its Python API. Authentication failures become a safe terminal error, while direct
-  media upload remains available. Cookie data and secret paths are never exposed.
+- **Optional YouTube Cookies**: The configured Netscape cookie secret remains mounted
+  read-only. A serialized yt-dlp runner atomically refreshes a private mode-`600` copy under
+  `/tmp`, allowing yt-dlp to update its cookie jar without mutating the secret mount. Cookie
+  data and internal paths are never exposed.
+- **YouTube Challenge Solving**: The production image includes Deno and yt-dlp EJS scripts.
+  Missing challenge support, PO Token requirements, expired cookies, and unavailable media
+  formats become safe terminal errors with direct upload as the fallback.

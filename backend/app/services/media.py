@@ -11,6 +11,7 @@ import tempfile
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import RLock
 from urllib.parse import urljoin
 
 import httpx
@@ -75,6 +76,23 @@ YOUTUBE_COOKIE_REQUIRED_MESSAGE = (
     "YouTube requires authenticated cookies on this server. Update the server cookie file "
     "or upload the media file directly."
 )
+YOUTUBE_COOKIE_EXPIRED_MESSAGE = (
+    "YouTube authentication cookies have expired. Refresh the server cookie secret or "
+    "upload the media file directly."
+)
+YOUTUBE_JAVASCRIPT_UNAVAILABLE_MESSAGE = (
+    "YouTube's JavaScript challenge solver is unavailable on this server. Verify the Deno "
+    "runtime and yt-dlp EJS components, then retry or upload the media file directly."
+)
+YOUTUBE_PO_TOKEN_REQUIRED_MESSAGE = (
+    "YouTube requires a PO Token for this media. Configure a supported yt-dlp PO Token "
+    "provider or upload the media file directly."
+)
+YOUTUBE_FORMATS_UNAVAILABLE_MESSAGE = (
+    "YouTube did not provide downloadable audio or video formats. Refresh authentication, "
+    "configure required challenge or PO Token support, or upload the media file directly."
+)
+YTDLP_RUNTIME_COOKIE_FILE = Path("/tmp/enterprise-rag/youtube-cookies.txt")
 YOUTUBE_AUTH_PATTERNS = (
     "sign in to confirm you’re not a bot",
     "sign in to confirm you're not a bot",
@@ -82,19 +100,162 @@ YOUTUBE_AUTH_PATTERNS = (
     "cookies for authentication",
     "login required",
 )
+YOUTUBE_COOKIE_EXPIRED_PATTERNS = (
+    "cookies are no longer valid",
+    "cookies have expired",
+    "cookie is no longer valid",
+    "cookie has expired",
+    "expired cookies",
+)
+YOUTUBE_JAVASCRIPT_PATTERNS = (
+    "js runtimes: none",
+    "no supported javascript runtime",
+    "javascript challenge solver",
+    "n challenge solving failed",
+    "signature solving failed",
+    "yt-dlp-ejs",
+)
+YOUTUBE_PO_TOKEN_PATTERNS = (
+    "po token",
+    "po-token",
+    "po_token",
+    "pot provider",
+    "proof of origin",
+)
+YOUTUBE_FORMAT_PATTERNS = (
+    "only images are available for download",
+    "requested format is not available",
+    "no video formats found",
+    "no formats found",
+    "no downloadable formats",
+)
+YOUTUBE_FAILURES = (
+    (
+        YOUTUBE_COOKIE_EXPIRED_PATTERNS,
+        "youtube_cookies_expired",
+        YOUTUBE_COOKIE_EXPIRED_MESSAGE,
+    ),
+    (
+        YOUTUBE_JAVASCRIPT_PATTERNS,
+        "youtube_javascript_runtime_unavailable",
+        YOUTUBE_JAVASCRIPT_UNAVAILABLE_MESSAGE,
+    ),
+    (
+        YOUTUBE_PO_TOKEN_PATTERNS,
+        "youtube_po_token_required",
+        YOUTUBE_PO_TOKEN_REQUIRED_MESSAGE,
+    ),
+    (
+        YOUTUBE_FORMAT_PATTERNS,
+        "youtube_formats_unavailable",
+        YOUTUBE_FORMATS_UNAVAILABLE_MESSAGE,
+    ),
+    (
+        YOUTUBE_AUTH_PATTERNS,
+        "youtube_authentication_required",
+        YOUTUBE_COOKIE_REQUIRED_MESSAGE,
+    ),
+)
+_YTDLP_LOCK = RLock()
+_YTDLP_COOKIE_SOURCE_SIGNATURE: tuple[str, int, int, str] | None = None
+
+
+def deno_is_available() -> bool:
+    """Return whether a working Deno executable is available without logging its path."""
+
+    runtime = shutil.which("deno")
+    if runtime is None:
+        return False
+    try:
+        result = subprocess.run(
+            [runtime, "--version"],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0
+
+
+def _classify_youtube_failure(message: str) -> tuple[str, str] | None:
+    normalized = message.lower()
+    for patterns, code, safe_message in YOUTUBE_FAILURES:
+        if any(pattern in normalized for pattern in patterns):
+            return code, safe_message
+    return None
+
+
+def prepare_runtime_ytdlp_cookie(configured: Path | None) -> Path | None:
+    """Create or refresh yt-dlp's writable cookie jar from a read-only secret."""
+
+    global _YTDLP_COOKIE_SOURCE_SIGNATURE
+
+    if configured is None:
+        return None
+    try:
+        source = configured.expanduser()
+        if not source.is_file() or not os.access(source, os.R_OK):
+            return None
+        runtime_file = YTDLP_RUNTIME_COOKIE_FILE
+        with _YTDLP_LOCK:
+            source_stat = source.stat()
+            signature = (
+                str(source.resolve()),
+                source_stat.st_mtime_ns,
+                source_stat.st_size,
+                str(runtime_file),
+            )
+            runtime_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            runtime_file.parent.chmod(0o700)
+            if signature != _YTDLP_COOKIE_SOURCE_SIGNATURE or not runtime_file.is_file():
+                descriptor, temporary_name = tempfile.mkstemp(
+                    prefix=".youtube-cookies-",
+                    dir=runtime_file.parent,
+                )
+                temporary_path = Path(temporary_name)
+                try:
+                    os.fchmod(descriptor, 0o600)
+                    destination = os.fdopen(descriptor, "wb")
+                    descriptor = -1
+                    with destination, source.open("rb") as origin:
+                        shutil.copyfileobj(origin, destination)
+                    os.replace(temporary_path, runtime_file)
+                finally:
+                    if descriptor >= 0:
+                        os.close(descriptor)
+                    temporary_path.unlink(missing_ok=True)
+                _YTDLP_COOKIE_SOURCE_SIGNATURE = signature
+            runtime_file.chmod(0o600)
+    except OSError:
+        raise ProcessingError(
+            "YouTube authentication cookies could not be prepared securely. Refresh the "
+            "server secret or upload the media file directly.",
+            code="youtube_cookie_runtime_unavailable",
+        ) from None
+    return runtime_file
 
 
 class _SilentYtdlpLogger:
-    """Prevent yt-dlp diagnostics from printing URLs, headers, or cookie details."""
+    """Classify yt-dlp diagnostics without retaining or printing sensitive text."""
 
-    def debug(self, _message: str) -> None:
-        return
+    def __init__(self) -> None:
+        self.failure: tuple[str, str] | None = None
 
-    def warning(self, _message: str) -> None:
-        return
+    def _inspect(self, message: str) -> None:
+        classified = _classify_youtube_failure(message)
+        if classified is not None and self.failure is None:
+            self.failure = classified
 
-    def error(self, _message: str) -> None:
-        return
+    def debug(self, message: str) -> None:
+        self._inspect(message)
+
+    def warning(self, message: str) -> None:
+        self._inspect(message)
+
+    def error(self, message: str) -> None:
+        self._inspect(message)
 
 
 class MediaIngestionService:
@@ -883,17 +1044,10 @@ class MediaProcessingService:
         )
         self.session.commit()
 
-    def _readable_cookie_file(self) -> Path | None:
-        configured = self.settings.ytdlp_cookies_file
-        if configured is None:
-            return None
-        try:
-            path = configured.expanduser()
-            if path.is_file() and os.access(path, os.R_OK):
-                return path
-        except OSError:
-            return None
-        return None
+    def _prepare_runtime_cookie_file(self) -> Path | None:
+        """Atomically refresh a private writable copy of the read-only cookie secret."""
+
+        return prepare_runtime_ytdlp_cookie(self.settings.ytdlp_cookies_file)
 
     def _run_ytdlp(
         self,
@@ -903,6 +1057,11 @@ class MediaProcessingService:
         download: bool,
         error_code: str,
     ) -> dict[str, object]:
+        if not deno_is_available():
+            raise ProcessingError(
+                YOUTUBE_JAVASCRIPT_UNAVAILABLE_MESSAGE,
+                code="youtube_javascript_runtime_unavailable",
+            )
         try:
             from yt_dlp import YoutubeDL
         except ImportError as exc:
@@ -912,33 +1071,39 @@ class MediaProcessingService:
                 code="youtube_tool_unavailable",
             ) from exc
 
-        safe_options: dict[str, object] = {
-            "quiet": True,
-            "no_warnings": True,
-            "noplaylist": True,
-            "noprogress": True,
-            "socket_timeout": self.settings.media_download_timeout_seconds,
-            "logger": _SilentYtdlpLogger(),
-            **options,
-        }
-        cookie_file = self._readable_cookie_file()
-        if cookie_file is not None:
-            safe_options["cookiefile"] = str(cookie_file)
-        try:
-            with YoutubeDL(safe_options) as downloader:
-                value = downloader.extract_info(url, download=download)
-        except Exception as exc:
-            detail = str(exc).lower()
-            if any(pattern in detail for pattern in YOUTUBE_AUTH_PATTERNS):
+        logger = _SilentYtdlpLogger()
+        with _YTDLP_LOCK:
+            safe_options: dict[str, object] = {
+                "quiet": True,
+                # Keep warnings flowing to the private classifier so an n-challenge or
+                # PO-token warning can determine the safe terminal error. The custom
+                # logger never prints or retains the underlying diagnostic text.
+                "no_warnings": False,
+                "noplaylist": True,
+                "noprogress": True,
+                "socket_timeout": self.settings.media_download_timeout_seconds,
+                "js_runtimes": {"deno": {"path": None}},
+                "logger": logger,
+                **options,
+            }
+            if download:
+                safe_options.setdefault("format", "bestaudio/best")
+            cookie_file = self._prepare_runtime_cookie_file()
+            if cookie_file is not None:
+                safe_options["cookiefile"] = str(cookie_file)
+            try:
+                with YoutubeDL(safe_options) as downloader:
+                    value = downloader.extract_info(url, download=download)
+            except Exception as exc:
+                classified = logger.failure or _classify_youtube_failure(str(exc))
+                if classified is not None:
+                    code, safe_message = classified
+                    raise ProcessingError(safe_message, code=code) from None
                 raise ProcessingError(
-                    YOUTUBE_COOKIE_REQUIRED_MESSAGE,
-                    code="youtube_authentication_required",
+                    "YouTube could not provide this media. Refresh authentication, retry "
+                    "later, or upload the media file directly.",
+                    code=error_code,
                 ) from None
-            raise ProcessingError(
-                "YouTube could not provide this media. Update the server cookies, retry later, "
-                "or upload the media file directly.",
-                code=error_code,
-            ) from None
         if not isinstance(value, dict):
             raise ProcessingError(
                 "YouTube returned invalid media metadata. Upload the media file directly.",

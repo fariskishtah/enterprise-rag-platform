@@ -1,4 +1,9 @@
+import os
+import stat
+import subprocess
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -14,10 +19,29 @@ from app.media.transcription import (
     TranscriptionResult,
 )
 from app.services.media import (
+    YOUTUBE_COOKIE_EXPIRED_MESSAGE,
     YOUTUBE_COOKIE_REQUIRED_MESSAGE,
+    YOUTUBE_FORMATS_UNAVAILABLE_MESSAGE,
+    YOUTUBE_JAVASCRIPT_UNAVAILABLE_MESSAGE,
+    YOUTUBE_PO_TOKEN_REQUIRED_MESSAGE,
     MediaProcessingService,
+    deno_is_available,
 )
 from tests.helpers import create_knowledge_base, make_test_wav
+
+
+@pytest.fixture
+def ytdlp_runtime_cookie(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Path:
+    runtime_cookie = tmp_path / "runtime" / "youtube-cookies.txt"
+    monkeypatch.setattr(
+        "app.services.media.YTDLP_RUNTIME_COOKIE_FILE",
+        runtime_cookie,
+    )
+    monkeypatch.setattr("app.services.media.deno_is_available", lambda: True)
+    return runtime_cookie
 
 
 class DeterministicTranscriptionProvider(TranscriptionProvider):
@@ -338,9 +362,11 @@ def test_ytdlp_cookie_file_is_optional_readable_and_never_returned_by_api(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
+    ytdlp_runtime_cookie: Path,
 ) -> None:
     cookie_file = tmp_path / "youtube-cookies.txt"
     cookie_file.write_text("secret-cookie-line", encoding="utf-8")
+    cookie_file.chmod(0o400)
     captured_options: list[dict[str, object]] = []
 
     class FakeYoutubeDL:
@@ -375,10 +401,16 @@ def test_ytdlp_cookie_file_is_optional_readable_and_never_returned_by_api(
             error_code="youtube_metadata_unavailable",
         )
 
-    assert captured_options[0]["cookiefile"] == str(cookie_file)
+    assert captured_options[0]["cookiefile"] == str(ytdlp_runtime_cookie)
+    assert captured_options[0]["js_runtimes"] == {"deno": {"path": None}}
+    assert captured_options[0]["no_warnings"] is False
+    assert ytdlp_runtime_cookie.read_text(encoding="utf-8") == "secret-cookie-line"
+    assert stat.S_IMODE(ytdlp_runtime_cookie.stat().st_mode) == 0o600
+    assert stat.S_IMODE(cookie_file.stat().st_mode) == 0o400
     assert "secret-cookie-line" not in caplog.text
     configuration_text = client.get("/api/v1/rag/config").text
     assert str(cookie_file) not in configuration_text
+    assert str(ytdlp_runtime_cookie) not in configuration_text
     assert "secret-cookie-line" not in configuration_text
 
 
@@ -388,7 +420,9 @@ def test_ytdlp_omits_cookiefile_when_not_configured_or_not_readable(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     configured_path: str | None,
+    ytdlp_runtime_cookie: Path,
 ) -> None:
+    del ytdlp_runtime_cookie
     captured_options: list[dict[str, object]] = []
 
     class FakeYoutubeDL:
@@ -439,7 +473,9 @@ def test_youtube_antibot_error_becomes_safe_terminal_failure_without_secrets(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
+    ytdlp_runtime_cookie: Path,
 ) -> None:
+    del ytdlp_runtime_cookie
     secret = "private-cookie-value"
 
     class FailingYoutubeDL:
@@ -477,3 +513,220 @@ def test_youtube_antibot_error_becomes_safe_terminal_failure_without_secrets(
     assert failed["safe_error_message"] == YOUTUBE_COOKIE_REQUIRED_MESSAGE
     assert secret not in str(failed)
     assert secret not in caplog.text
+
+
+def test_runtime_cookie_refreshes_when_read_only_source_mtime_changes(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    ytdlp_runtime_cookie: Path,
+) -> None:
+    source = tmp_path / "youtube-secret.txt"
+    source.write_text("first-secret-cookie", encoding="utf-8")
+    source.chmod(0o400)
+    observed_contents: list[str] = []
+
+    class WritableCookieYoutubeDL:
+        def __init__(self, options: dict[str, object]) -> None:
+            self.cookie_file = Path(str(options["cookiefile"]))
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def extract_info(self, _url: str, *, download: bool):
+            observed_contents.append(self.cookie_file.read_text(encoding="utf-8"))
+            self.cookie_file.write_text("yt-dlp-runtime-update", encoding="utf-8")
+            return {"id": "video", "download": download}
+
+    monkeypatch.setitem(
+        sys.modules,
+        "yt_dlp",
+        SimpleNamespace(YoutubeDL=WritableCookieYoutubeDL),
+    )
+    settings = client.app.state.settings.model_copy(update={"ytdlp_cookies_file": source})
+    with session_scope(client.app.state.session_factory) as session:
+        service = MediaProcessingService(
+            session=session,
+            storage=client.app.state.file_storage,
+            settings=settings,
+            embedding_provider=client.app.state.embedding_provider,
+            transcription_provider=client.app.state.transcription_provider,
+        )
+        service._run_ytdlp(
+            "https://www.youtube.com/watch?v=refresh",
+            {},
+            download=False,
+            error_code="youtube_metadata_unavailable",
+        )
+        first_mtime = source.stat().st_mtime_ns
+        source.chmod(0o600)
+        source.write_text("second-secret-cookie", encoding="utf-8")
+        os.utime(source, ns=(first_mtime + 1_000_000_000, first_mtime + 1_000_000_000))
+        source.chmod(0o400)
+        service._run_ytdlp(
+            "https://www.youtube.com/watch?v=refresh",
+            {},
+            download=False,
+            error_code="youtube_metadata_unavailable",
+        )
+
+    assert observed_contents == ["first-secret-cookie", "second-secret-cookie"]
+    assert stat.S_IMODE(ytdlp_runtime_cookie.stat().st_mode) == 0o600
+    assert "first-secret-cookie" not in caplog.text
+    assert "second-secret-cookie" not in caplog.text
+
+
+def test_ytdlp_jobs_are_serialized_and_use_audio_safe_format(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    ytdlp_runtime_cookie: Path,
+) -> None:
+    del ytdlp_runtime_cookie
+    active = 0
+    maximum_active = 0
+    captured_formats: list[object] = []
+
+    class ConcurrentYoutubeDL:
+        def __init__(self, options: dict[str, object]) -> None:
+            captured_formats.append(options.get("format"))
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def extract_info(self, _url: str, *, download: bool):
+            nonlocal active, maximum_active
+            active += 1
+            maximum_active = max(maximum_active, active)
+            time.sleep(0.02)
+            active -= 1
+            return {"id": "video", "download": download}
+
+    monkeypatch.setitem(sys.modules, "yt_dlp", SimpleNamespace(YoutubeDL=ConcurrentYoutubeDL))
+    with session_scope(client.app.state.session_factory) as session:
+        service = MediaProcessingService(
+            session=session,
+            storage=client.app.state.file_storage,
+            settings=client.app.state.settings,
+            embedding_provider=client.app.state.embedding_provider,
+            transcription_provider=client.app.state.transcription_provider,
+        )
+
+        def run() -> dict[str, object]:
+            return service._run_ytdlp(
+                "https://www.youtube.com/watch?v=concurrent",
+                {},
+                download=True,
+                error_code="youtube_media_unavailable",
+            )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(lambda _index: run(), range(2)))
+
+    assert len(results) == 2
+    assert maximum_active == 1
+    assert captured_formats == ["bestaudio/best", "bestaudio/best"]
+
+
+def test_deno_availability_check_is_bounded_and_requires_a_working_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[list[str], int]] = []
+
+    def successful_run(command: list[str], **options: object):
+        calls.append((command, int(options["timeout"])))
+        assert options["stdout"] is subprocess.DEVNULL
+        assert options["stderr"] is subprocess.DEVNULL
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr("app.services.media.shutil.which", lambda _name: "/runtime/deno")
+    monkeypatch.setattr("app.services.media.subprocess.run", successful_run)
+    assert deno_is_available() is True
+    assert calls == [(["/runtime/deno", "--version"], 5)]
+
+    monkeypatch.setattr("app.services.media.shutil.which", lambda _name: None)
+    assert deno_is_available() is False
+
+
+@pytest.mark.parametrize(
+    ("diagnostic", "raised_detail", "expected_code", "expected_message"),
+    [
+        (
+            "JS runtimes: none; n challenge solving failed for private-value",
+            "Requested format is not available for private-value",
+            "youtube_javascript_runtime_unavailable",
+            YOUTUBE_JAVASCRIPT_UNAVAILABLE_MESSAGE,
+        ),
+        (
+            "Only images are available for download",
+            "Requested format is not available for private-value",
+            "youtube_formats_unavailable",
+            YOUTUBE_FORMATS_UNAVAILABLE_MESSAGE,
+        ),
+        (
+            "This client requires a PO Token private-value",
+            "No downloadable formats for private-value",
+            "youtube_po_token_required",
+            YOUTUBE_PO_TOKEN_REQUIRED_MESSAGE,
+        ),
+        (
+            "The provided YouTube account cookies are no longer valid",
+            "Cookies have expired private-value",
+            "youtube_cookies_expired",
+            YOUTUBE_COOKIE_EXPIRED_MESSAGE,
+        ),
+    ],
+)
+def test_youtube_challenge_failures_become_safe_terminal_errors(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    ytdlp_runtime_cookie: Path,
+    diagnostic: str,
+    raised_detail: str,
+    expected_code: str,
+    expected_message: str,
+) -> None:
+    del ytdlp_runtime_cookie
+
+    class FailingYoutubeDL:
+        def __init__(self, options: dict[str, object]) -> None:
+            self.logger = options["logger"]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def extract_info(self, _url: str, *, download: bool):
+            del download
+            self.logger.warning(diagnostic)
+            raise RuntimeError(raised_detail)
+
+    monkeypatch.setitem(sys.modules, "yt_dlp", SimpleNamespace(YoutubeDL=FailingYoutubeDL))
+    monkeypatch.setattr("app.services.media.validate_public_url", lambda value: value)
+    knowledge_base_id = create_knowledge_base(client)
+    linked = client.post(
+        f"/api/v1/knowledge-bases/{knowledge_base_id}/media/from-url",
+        json={
+            "url": "https://www.youtube.com/watch?v=challenge",
+            "auto_process": False,
+        },
+    )
+    assert linked.status_code == 201, linked.text
+    queued = client.post(f"/api/v1/media/{linked.json()['id']}/process")
+    assert queued.status_code == 202, queued.text
+    failed = client.get(f"/api/v1/media/{linked.json()['id']}").json()
+
+    assert failed["status"] == "failed"
+    assert failed["error_code"] == expected_code
+    assert failed["safe_error_message"] == expected_message
+    assert "private-value" not in str(failed)
+    assert "private-value" not in caplog.text

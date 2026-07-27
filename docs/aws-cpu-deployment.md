@@ -24,6 +24,13 @@ available, remove `ENTERPRISE_RAG_YTDLP_COOKIES_FILE` and the cookie mount; ordi
 unauthenticated yt-dlp behavior remains enabled. Direct MP3, MP4, WAV, M4A, MOV, MKV, and
 other supported uploads remain the reliable fallback.
 
+The host file remains read-only inside the container. Immediately before yt-dlp runs, the
+backend atomically copies it to `/tmp/enterprise-rag/youtube-cookies.txt`, restricts that
+copy to mode `600`, and serializes yt-dlp jobs so yt-dlp can safely refresh its writable
+cookie jar. The copy is replaced when the mounted source file's modification time changes;
+cookie contents and both filesystem paths remain private. Update the host file atomically
+when rotating cookies so the bind mount receives the new modification time.
+
 ## Build and run
 
 ```bash
@@ -38,6 +45,31 @@ docker run -d \
   -v /home/ubuntu/youtube-cookies.txt:/run/secrets/youtube-cookies.txt:ro \
   enterprise-rag:arabic-youtube-test
 ```
+
+Following the [official yt-dlp EJS guide](https://github.com/yt-dlp/yt-dlp/wiki/EJS), the
+production image includes Deno and the matching yt-dlp EJS package for YouTube's JavaScript
+challenges. Verify the runtime after deployment:
+
+```bash
+docker exec enterprise-rag deno --version
+docker exec enterprise-rag yt-dlp --version
+```
+
+After application startup has prepared the private runtime cookie copy, an operator can
+perform a metadata-only diagnostic without making the secret mount writable:
+
+```bash
+docker exec enterprise-rag \
+  yt-dlp --cookies /tmp/enterprise-rag/youtube-cookies.txt \
+  --skip-download 'https://www.youtube.com/watch?v=jNQXAC9IVRw'
+```
+
+Use a URL you are authorized to access. Failures for a missing JavaScript solver, required
+PO Token, unavailable audio/video formats, or expired cookies are terminal and sanitized.
+YouTube increasingly requires per-video PO Tokens for some clients; when that applies,
+follow the [official PO Token guide](https://github.com/yt-dlp/yt-dlp/wiki/PO-Token-Guide)
+to configure a maintained provider, or use direct media upload rather than placing a token
+in application logs or source control.
 
 The application starts with cold models by default so health checks are not held behind
 downloads. Open Settings and select **Warm models** when controlled warm-up is appropriate,

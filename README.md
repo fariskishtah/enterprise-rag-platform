@@ -107,8 +107,8 @@ EnterpriseRAG ingests documents through a multi-stage pipeline:
 
 Process uploaded MP4/MKV/WAV files or public YouTube URLs:
 - **Transcription**: `faster-whisper` (`tiny`, `base`, or `small`; CPU `int8`, Arabic/English/auto).
-- **Secure YouTube ingestion**: Optional read-only yt-dlp cookie file with safe terminal
-  authentication errors and direct-upload fallback.
+- **Secure YouTube ingestion**: Optional read-only yt-dlp cookie secret, private writable
+  runtime copy, Deno/EJS challenge solving, safe terminal errors, and direct-upload fallback.
 - **Segmentation**: Sentence-level timestamp alignment.
 - **Smart Chapters**: Automatic chapter boundaries and key points.
 - **Timestamp Citations**: Clicking a citation jumps directly to that timestamp in the embedded video player.
@@ -302,7 +302,7 @@ Key environment settings in `backend/.env` (or `.env.low-memory.example`):
 | `ENTERPRISE_RAG_EMBEDDING_MODEL_NAME` | `sentence-transformers/all-MiniLM-L6-v2` | Embedding model ID |
 | `ENTERPRISE_RAG_MAX_CONCURRENT_GENERATIONS` | `2` | Process semaphore concurrency limit |
 | `ENTERPRISE_RAG_GENERATION_TIMEOUT_SECONDS` | `90` | Route generation timeout (seconds) |
-| `ENTERPRISE_RAG_YTDLP_COOKIES_FILE` | unset | Optional readable yt-dlp cookie file; never exposed by the API |
+| `ENTERPRISE_RAG_YTDLP_COOKIES_FILE` | unset | Optional read-only cookie secret; copied privately for yt-dlp and never exposed by the API |
 | `ENTERPRISE_RAG_TRANSCRIPTION_LANGUAGE` | `auto` | Transcription language: `auto`, `ar`, or `en` |
 | `ENTERPRISE_RAG_WARM_MODELS_ON_STARTUP` | `false` | Non-blocking optional model warm-up |
 
