@@ -14,9 +14,10 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "jsx": "react-jsx",
     "noUncheckedIndexedAccess": true
   },
   "include": ["src", "vite.config.ts"]
 }
-

@@ -62,7 +62,7 @@ npm run test --prefix frontend
 
 1. `npm run typecheck --prefix frontend` — no TypeScript errors.
 2. `npm run build --prefix frontend` — production files appear under `frontend/dist/`; production client contains same-origin `/api/v1`, not a development host.
-3. `npm run test --prefix frontend` — all 8 unit-test files pass.
+3. `npm run test --prefix frontend` — all 13 unit-test files pass.
 
 **Coverage:**
 
@@ -72,9 +72,12 @@ npm run test --prefix frontend
 - Bounded document polling: `DocumentPage.test.tsx`.
 - Login error/loading/token behavior: `LoginPage.test.tsx`.
 - Settings terminal load failure: `SettingsPage.test.tsx`.
+- Workspace route/scoping behavior: `WorkspacePage.test.tsx`, `IntelligencePage.test.tsx`.
+- API-backed source readiness and feedback loading: `DashboardPage.test.tsx`, `FeedbackPage.test.tsx`.
+- Non-interactive current-workspace status semantics: `AppShell.test.tsx`.
 - Arabic direction helper: `utils/language.test.ts`.
 
-**Known coverage gap:** Dashboard, KB, Upload, Video, Intelligence, Evaluation, Feedback, Templates, Workspace, Landing, and Legal do not each have a dedicated unit-test file. Browser/backend tests cover parts of them.
+**Known coverage gap:** Knowledge Bases, Upload, Video, Evaluation, Templates, Landing, and Legal do not each have a dedicated unit-test file. Browser/backend tests cover parts of them.
 
 ## Deterministic Playwright tests
 
@@ -160,9 +163,9 @@ cd ..
 curl -i http://127.0.0.1:7860/api/v1/readiness
 ```
 
-**Steps:** Confirm the single head/current revision is `0004_public_demo_lifecycle`; inspect 19 table names read-only; create parent/child test data; delete a document/session/media through API and verify intended cascades; do not manually delete rows.
+**Steps:** Confirm the single head/current revision is `0004_public_demo_lifecycle`; on a disposable database compare the tables immediately after `alembic upgrade head` with `Base.metadata.tables`; then start the app and inspect all 19 table names read-only. Create parent/child test data; delete a document/session/media through API and verify intended cascades; do not manually delete rows.
 
-**Expected result:** Migration succeeds, readiness schema check is ready, foreign-key/cascade behavior matches the model guide.
+**Expected result:** Migration succeeds and normal startup/readiness/tests work. Record the known six-table migration-only coverage gap rather than treating the head revision as complete schema proof; foreign-key/cascade behavior should match the model guide.
 
 **Relevant files:** `backend/migrations/`; `backend/app/models/`; `backend/tests/test_health.py`, `test_documents.py`, `test_media.py`.
 
@@ -252,7 +255,7 @@ scripts/restore-production.sh /absolute/disposable/backups/<backup-directory> --
 ```bash
 docker build -t enterprise-rag:production-test .
 docker run --rm --name enterprise-rag-production-test \
-  -p 7865:7860 --env-file .env.low-memory.example \
+  -p 7865:7860 \
   enterprise-rag:production-test
 ```
 
@@ -269,7 +272,7 @@ PLAYWRIGHT_PRODUCTION=1 \
 npm run test:e2e --prefix frontend -- production-smoke.spec.ts
 ```
 
-**Expected result:** Image builds; startup migrates; `/`, assets, API, and direct SPA routes work; production API requests stay under same-origin `/api/v1`; no console/network/auth/loading failure; Deno is 2.3+.
+**Expected result:** Image builds with its disposable `/tmp` profile; startup migrates; `/`, assets, API, and direct SPA routes work; production API requests stay under same-origin `/api/v1`; no console/network/auth/loading failure; Deno is 2.3+.
 
 **Relevant files:** `Dockerfile`, `start-space.sh`, `frontend/e2e/production-smoke.spec.ts`, `backend/app/main.py:208-224`.
 

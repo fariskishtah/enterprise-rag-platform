@@ -281,9 +281,8 @@ class Settings(BaseSettings):
 def _apply_if_default(
     settings: Settings, field: str, profile_value: object, default: object
 ) -> None:
-    """Set *field* to *profile_value* only when the current value matches the
-    class-level *default*, indicating no explicit user override."""
-    if getattr(settings, field) == default:
+    """Apply a profile value only when the caller did not explicitly set the field."""
+    if field not in settings.model_fields_set and getattr(settings, field) == default:
         object.__setattr__(settings, field, profile_value)
 
 

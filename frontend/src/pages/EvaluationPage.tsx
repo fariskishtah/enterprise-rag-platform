@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BarChart2, CheckCircle2, Clock, Play, AlertCircle, Download } from "lucide-react";
+import { Download, Play } from "lucide-react";
 import { listEvaluationDatasets, listEvaluationRuns, runEvaluation } from "../api/client";
 
 interface EvalRun {

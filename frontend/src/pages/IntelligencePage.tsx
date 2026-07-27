@@ -55,10 +55,17 @@ export function IntelligencePage() {
   }, [generating]);
 
   useEffect(() => {
+    const requestedKnowledgeBaseId = new URLSearchParams(window.location.search).get(
+      "knowledgeBase",
+    );
     listKnowledgeBases()
       .then((response) => {
         setKnowledgeBases(response.items);
-        if (response.items[0]) setKnowledgeBaseId(response.items[0].id);
+        const requestedKnowledgeBase = response.items.find(
+          (knowledgeBase) => knowledgeBase.id === requestedKnowledgeBaseId,
+        );
+        const initialKnowledgeBase = requestedKnowledgeBase ?? response.items[0];
+        if (initialKnowledgeBase) setKnowledgeBaseId(initialKnowledgeBase.id);
       })
       .catch((reason: unknown) =>
         setError(reason instanceof Error ? reason.message : "Unable to load knowledge bases."),

@@ -51,7 +51,7 @@ Classifications describe the current repository, not a future roadmap.
 
 | Feature | What exists / what is missing |
 |---|---|
-| Knowledge-base workspace | Static scoped links exist (`WorkspacePage.tsx`); it does not fetch/validate/name the KB, and several destinations ignore scope. |
+| Knowledge-base workspace | Named routes are correct and Source/Chat/Intelligence preserve scope; the page still does not fetch, validate, or name the KB. |
 | Knowledge-base lifecycle management UI | Create/list/open works; edit/delete/protect controls do not exist. |
 | Evaluation dashboard | List/run/aggregate/export works; dataset/case creation and per-case result inspection are absent from UI. |
 | Feedback experience | Analytics page works; no answer rating form, feedback record list, or conversion button. |
@@ -59,8 +59,8 @@ Classifications describe the current repository, not a future roadmap.
 | Demo onboarding | Seed route and frontend client exist; no visible seed button. |
 | Chat regenerate/cancel | Regenerate only prefills a new prompt; stop icon does not abort. Normal ask/error/loading is implemented. |
 | Templates as workflows | Cards/filter/prompt forwarding work; output schemas are metadata and there is no structured executor/editor. |
-| Dashboard health metrics | Counts/config/recent sources are live; retrieval health bars are hard-coded decorative values. |
-| Workspace switcher/recent navigation | Visual controls/links exist; no switching and recents are fixed. |
+| Dashboard quality metrics | Counts/config/recent sources and source-readiness ratio are live; there is still no measured retrieval-quality or answer-quality score on this page. |
+| Recent navigation | Recent labels are fixed shortcuts rather than data-backed history. The current-workspace label is now non-interactive status text. |
 | Accounts identity | Registration/login/user table work; `/auth/me` is synthetic and content is not user-owned/scoped. |
 | Observability | JSON logs, request IDs, health/readiness, queue/storage/operation status exist; no metrics/tracing/alerts/dashboard stack. |
 | Document/media intelligence history | Chat/evaluation/media derived records persist; document summary/comparison/report results do not. |
@@ -80,19 +80,12 @@ Classifications describe the current repository, not a future roadmap.
 
 | Item | Evidence |
 |---|---|
-| Dashboard retrieval health percentage bars | Literal values in `frontend/src/pages/DashboardPage.tsx:243-248`. |
-| Sidebar workspace switcher | Button has no handler in `frontend/src/components/AppShell.tsx:144-151`. |
 | Sidebar recent labels | Fixed “Remote policy research” and “Transcript insights” links at `AppShell.tsx:180-190`. |
 | User avatar/profile | Fixed `ER`/“Demo session” display (`AppShell.tsx:271`); no profile menu. |
 
 ## Broken or likely broken
 
-| Item | Evidence and impact |
-|---|---|
-| Workspace “Evaluation” shortcut | The named Evaluation item targets `/intelligence` (`frontend/src/pages/WorkspacePage.tsx:19`) instead of the real `/evaluation` page. It navigates, but to the wrong feature. |
-| Workspace claims of focused scoping | Links add `knowledgeBase`, but `IntelligencePage` ignores it and selects the first KB. This can analyze the wrong collection unless the user reselects. |
-
-No other confirmed broken build/test/runtime feature was established by static inspection. Environment-dependent model/YouTube failures are configured limitations, not automatically code defects.
+No confirmed broken build/test/runtime feature remains from this review. The verified workspace route and Intelligence scope defects were fixed with unit coverage. Environment-dependent model/YouTube failures are configured limitations, not automatically code defects.
 
 ## Not found in the codebase
 

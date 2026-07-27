@@ -23,6 +23,17 @@ def test_low_memory_profile_defaults() -> None:
     assert settings.langchain_force_wrapper is True
 
 
+def test_runtime_profile_preserves_an_explicit_value_equal_to_the_class_default() -> None:
+    settings = Settings(
+        runtime_profile="low_memory",
+        generation_max_new_tokens=256,
+        max_context_characters=12000,
+    )
+
+    assert settings.generation_max_new_tokens == 256
+    assert settings.max_context_characters == 12000
+
+
 def test_aws_cpu_profile_uses_bounded_cpu_defaults_and_aliases() -> None:
     settings = Settings(runtime_profile="aws_cpu")
     assert settings.model_device == "cpu"

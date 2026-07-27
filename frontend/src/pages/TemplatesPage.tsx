@@ -1,19 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  AlertTriangle,
-  BookOpen,
-  Calendar,
-  CheckSquare,
-  FileText,
-  GitCompare,
-  Grid,
-  HelpCircle,
-  List,
-  Play,
-  ShieldCheck,
-  UserCheck,
-  Video,
-} from "lucide-react";
+import { Play } from "lucide-react";
 import { listTemplates } from "../api/client";
 
 interface Template {

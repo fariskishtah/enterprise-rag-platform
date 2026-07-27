@@ -10,14 +10,14 @@ import {
 } from "lucide-react";
 
 const tabs = [
-  ["Overview", LayoutDashboard, "/"],
-  ["Sources", FileStack, "/upload"],
-  ["Chat", Bot, "/chat"],
-  ["Summaries", Sparkles, "/intelligence"],
-  ["Compare", Files, "/intelligence"],
-  ["Reports", BarChart3, "/intelligence"],
-  ["Evaluation", FlaskConical, "/intelligence"],
-  ["Settings", Settings, "/settings"],
+  ["Overview", LayoutDashboard, "/dashboard", false],
+  ["Sources", FileStack, "/upload", true],
+  ["Chat", Bot, "/chat", true],
+  ["Summaries", Sparkles, "/intelligence", true],
+  ["Compare", Files, "/intelligence", true],
+  ["Reports", BarChart3, "/intelligence", true],
+  ["Evaluation", FlaskConical, "/evaluation", false],
+  ["Settings", Settings, "/settings", false],
 ] as const;
 
 export function WorkspacePage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
@@ -29,10 +29,14 @@ export function WorkspacePage({ knowledgeBaseId }: { knowledgeBaseId: string }) 
         <p>One source boundary, every intelligence workflow.</p>
       </header>
       <nav className="workspace-tabs" aria-label="Knowledge base sections">
-        {tabs.map(([label, Icon, target]) => (
+        {tabs.map(([label, Icon, target, preservesScope]) => (
           <a
             key={label}
-            href={`${target}${target.includes("?") ? "&" : "?"}knowledgeBase=${knowledgeBaseId}`}
+            href={
+              preservesScope
+                ? `${target}?knowledgeBase=${encodeURIComponent(knowledgeBaseId)}`
+                : target
+            }
           >
             <Icon size={17} />
             {label}
@@ -43,8 +47,8 @@ export function WorkspacePage({ knowledgeBaseId }: { knowledgeBaseId: string }) 
         <span><Sparkles size={28} /></span>
         <h2>Choose a workflow above.</h2>
         <p>
-          Every tab stays scoped to this knowledge base, keeping retrieval and
-          comparison boundaries explicit.
+          Source, chat, and intelligence shortcuts preserve this collection selection.
+          Overview, evaluation, and settings open shared workspace views.
         </p>
       </div>
     </section>

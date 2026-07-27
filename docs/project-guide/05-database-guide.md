@@ -184,12 +184,14 @@ The lifecycle mixin is used by knowledge bases, documents, and media. Cleanup al
 
 | Revision | File | What it introduces |
 |---|---|---|
-| `0001_phase1_baseline` | `backend/migrations/versions/0001_phase1_baseline.py` | Users, knowledge bases, initial documents, indexes/constraints. |
+| `0001_phase1` | `backend/migrations/versions/0001_phase1_baseline.py` | Knowledge bases, initial documents, indexes/constraints. |
 | `0002_processing_rag_intelligence` | `backend/migrations/versions/0002_processing_rag_intelligence.py` | Detailed document processing data, sections/chunks, conversations/messages. |
 | `0003_media_intelligence` | `backend/migrations/versions/0003_media_intelligence.py` | Media sources, transcript jobs/segments, summaries, chapters, attempts, exports. |
-| `0004_public_demo_lifecycle` | `backend/migrations/versions/0004_public_demo_lifecycle.py` | Demo lifecycle columns/indexes and evaluation/feedback tables. |
+| `0004_public_demo_lifecycle` | `backend/migrations/versions/0004_public_demo_lifecycle.py` | Demo lifecycle columns/indexes on knowledge bases, documents, and media sources. |
 
-The expected head is the fourth migration. Application lifespan also calls `Base.metadata.create_all` (`backend/app/main.py:66-72`), which helps fresh development databases, but operators should still run Alembic so `alembic_version` accurately proves migration history. Production startup calls `backend/scripts/migrate_database.py` before Uvicorn (`start-space.sh:9-15`).
+The expected head is the fourth migration, but the chain is not a complete representation of current ORM metadata. A fresh `alembic upgrade head` creates 13 application tables, while SQLAlchemy maps 19. The missing tables are `users`, `evaluation_datasets`, `evaluation_cases`, `evaluation_runs`, `evaluation_results`, and `user_feedback`. Application lifespan then calls `Base.metadata.create_all` (`backend/app/main.py:66-72`), which creates those missing tables; production startup runs Alembic before Uvicorn (`start-space.sh:9-15`).
+
+This keeps the current application working, but it is a migration reproducibility risk: migration-only provisioning, schema review, and downgrade history do not cover all active tables. `/readiness` also checks only a subset of tables plus the head revision (`backend/app/api/routes/health.py:35-56`), so it does not detect this gap. A future migration should adopt existing installations and add the six tables to versioned history; that change needs a dedicated production rehearsal and was deliberately not made during this conservative review.
 
 ## Safe inspection
 
@@ -220,7 +222,8 @@ Inside the AWS container, use a backup or run only a read-only query against `/d
 1. Back up the database before any migration on an important environment.
 2. Run `cd backend && .venv/bin/alembic current` locally, or the migration script in the same container environment.
 3. Confirm current revision equals `0004_public_demo_lifecycle` and `alembic heads` shows the same single head.
-4. Call `/api/v1/readiness`. Its `_schema_is_current` check reads the migration state and fails readiness when it is stale (`backend/app/api/routes/health.py:35-81`).
-5. Run backend database/API tests in a disposable database.
+4. Inspect table names after normal application startup and confirm all 19 ORM tables exist. Do not treat `alembic current` alone as proof of complete schema coverage.
+5. Call `/api/v1/readiness`, while remembering that its schema check covers only selected tables and the revision (`backend/app/api/routes/health.py:35-81`).
+6. Run backend database/API tests in a disposable database.
 
 Do not run `alembic downgrade`, delete `alembic_version`, or directly modify tables as a troubleshooting shortcut.

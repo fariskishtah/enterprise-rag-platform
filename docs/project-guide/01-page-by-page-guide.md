@@ -11,7 +11,7 @@ The primary sidebar is defined at `frontend/src/components/AppShell.tsx:30-41,15
 | Item | Destination | Availability and status |
 |---|---|---|
 | Product Showcase | `/` | Always listed inside the authenticated shell, though `/` itself is public. Fully implemented static landing page. |
-| Overview | `/dashboard` | Authenticated. Fully implemented dashboard, but its “Retrieval health” bars are fixed display values, not measurements. |
+| Overview | `/dashboard` | Authenticated. API-backed workspace counts, source readiness, model configuration, recent sources, and shortcuts. |
 | Knowledge | `/knowledge-bases` | Authenticated. Create/list/open works; knowledge-base deletion is not present. |
 | Add knowledge | `/upload` | Authenticated shortcut above the nav. Requires a knowledge base before intake. |
 | Source library | `/upload` | Authenticated. Documents and media are combined in one library. |
@@ -24,7 +24,7 @@ The primary sidebar is defined at `frontend/src/components/AppShell.tsx:30-41,15
 | Settings | `/settings` | Authenticated footer item. Read-only configuration plus model warmup. |
 | Sign out | `/` after `POST /auth/logout` | Always in authenticated shell; clears the local bearer token even when logout fails. |
 
-The sidebar workspace switcher at `frontend/src/components/AppShell.tsx:144-151` is a display-only button with no click handler. The two “Recent” links are fixed labels, not a query of recent activity (`:180-190`). The command palette opens with Ctrl/Cmd+K or `/`, sends entered text to `/chat?question=...`, and provides upload/chat/video shortcuts (`:83-108,277-305`). Theme and sidebar/mobile controls work locally; the theme is stored in `localStorage` (`:43-59`).
+The sidebar current-workspace label at `frontend/src/components/AppShell.tsx` is non-interactive status text. The two “Recent” links remain fixed labels, not a query of recent activity. The command palette opens with Ctrl/Cmd+K or `/`, sends entered text to `/chat?question=...`, and provides upload/chat/video shortcuts. Theme and sidebar/mobile controls work locally; the theme is stored in `localStorage`.
 
 ## 1. Landing page
 
@@ -118,7 +118,7 @@ The sidebar workspace switcher at `frontend/src/components/AppShell.tsx:144-151`
 
 **Purpose:** Summarize knowledge bases, sources, model configuration, and shortcuts.
 
-**Main features:** Loads knowledge bases and RAG configuration, then documents and media for every knowledge base. Shows source/readiness totals, current engine/model/device, recent sources, model information, storage mode, quick actions, and five “Retrieval health” bars (`frontend/src/pages/DashboardPage.tsx:31-314`). The bar values `92, 76, 86, 97, 82` are hard-coded (`:243-248`); they are presentation, not live metrics. The grade changes only based on whether any source is ready.
+**Main features:** Loads knowledge bases and RAG configuration, then documents and media for every knowledge base. Shows source/readiness totals, current engine/model/device, recent sources, model information, storage mode, quick actions, and an API-backed ready-source percentage (`frontend/src/pages/DashboardPage.tsx`).
 
 **How to use it:** Review totals and recent sources. Open a document/media record or use quick actions for upload, chat, video, or intelligence.
 
@@ -126,7 +126,7 @@ The sidebar workspace switcher at `frontend/src/components/AppShell.tsx:144-151`
 
 **Expected result:** The dashboard reflects stored collections and source status. Model data matches `/api/v1/rag/config`.
 
-**Possible errors:** A failed knowledge-base or configuration request shows a page error. A failed per-knowledge-base source request produces a partial-data warning. Health bars must not be interpreted as measured accuracy.
+**Possible errors:** A failed knowledge-base, configuration, or child source request shows a page error and clears the loading state. The ready-source percentage is an ingestion-state ratio, not a retrieval-quality or answer-accuracy metric.
 
 **Frontend files:** `frontend/src/pages/DashboardPage.tsx`; `frontend/src/App.tsx:127-128`.
 
@@ -136,7 +136,7 @@ The sidebar workspace switcher at `frontend/src/components/AppShell.tsx:144-151`
 
 **Database models/tables:** `knowledge_bases`, `documents`, `media_sources`.
 
-**Tests:** Main path covered by Playwright specs; no dedicated dashboard unit test.
+**Tests:** `frontend/src/pages/DashboardPage.test.tsx` verifies the API-backed readiness percentage; Playwright covers navigation and production behavior.
 
 ## 5. Knowledge bases page
 
@@ -154,7 +154,7 @@ The sidebar workspace switcher at `frontend/src/components/AppShell.tsx:144-151`
 
 **Expected result:** A `knowledge_bases` row is created with lifecycle timestamps and appears in the list.
 
-**Possible errors:** Duplicate names are allowed because the model has an index, not a unique constraint. Quota errors can tell the user to remove a collection even though there is no delete route/UI; use cleanup or an operator procedure instead.
+**Possible errors:** Duplicate names are allowed because the model has an index, not a unique constraint. A quota error directs the user to an existing collection, expiry cleanup, or an operator because there is no delete route/UI.
 
 **Frontend files:** `frontend/src/pages/KnowledgeBasesPage.tsx`; API calls at `frontend/src/api/client.ts:149-162`.
 
@@ -174,15 +174,15 @@ The sidebar workspace switcher at `frontend/src/components/AppShell.tsx:144-151`
 
 **Purpose:** Provide shortcuts intended to carry a knowledge-base ID into other tools.
 
-**Main features:** Static heading, overview/source/chat/summary/compare/report/evaluation/settings tabs, and a displayed collection ID (`frontend/src/pages/WorkspacePage.tsx:12-50`). It does not fetch the collection, display its real name, or validate that it exists. It appends `knowledgeBase=<id>` to destinations.
+**Main features:** Static heading and overview/source/chat/summary/compare/report/evaluation/settings shortcuts (`frontend/src/pages/WorkspacePage.tsx`). It does not fetch the collection, display its real name, or validate that it exists. Source, chat, and intelligence shortcuts append an encoded `knowledgeBase=<id>`; shared overview, evaluation, and settings views do not claim collection scope.
 
-**How to use it:** Select a shortcut. Source library and chat read the query parameter. Other destinations may not honor it.
+**How to use it:** Select a shortcut. Source library, chat, and intelligence honor the collection parameter. Shared views open without it.
 
-**How to test it:** Open a real ID and a fake ID. Confirm both render the same static page. Test each link and inspect whether the destination keeps and uses `knowledgeBase`. Confirm that the Evaluation shortcut currently opens `/intelligence`, not `/evaluation`.
+**How to test it:** Open a real ID and a fake ID. Confirm both render the same static page. Verify Source, Chat, Summaries, Compare, and Reports preserve an encoded ID; verify Evaluation opens `/evaluation` and Overview opens `/dashboard`.
 
-**Expected result:** Navigation occurs with the ID in the query string.
+**Expected result:** Navigation reaches the named page, with the ID retained only for pages that implement collection scoping.
 
-**Possible errors:** This page is partial. `IntelligencePage` selects the first knowledge base instead of reading the query parameter, Settings ignores it, and several tabs share `/intelligence`. The “Evaluation” target is incorrect for the named feature (`frontend/src/pages/WorkspacePage.tsx:14-20`).
+**Possible errors:** This page remains partial: a fake/deleted ID is not validated here, and Summaries, Compare, and Reports intentionally share the Intelligence page rather than distinct routes.
 
 **Frontend files:** `frontend/src/pages/WorkspacePage.tsx`; dynamic match at `frontend/src/App.tsx:114,151-152`.
 
@@ -192,7 +192,7 @@ The sidebar workspace switcher at `frontend/src/components/AppShell.tsx:144-151`
 
 **Database models/tables:** None read by this page, though the ID represents `knowledge_bases.id`.
 
-**Tests:** No targeted unit or backend test; basic route behavior is covered only indirectly by browser tests.
+**Tests:** `frontend/src/pages/WorkspacePage.test.tsx` verifies named destinations and encoded collection scope; browser tests cover route behavior.
 
 ## 7. Source library and intake
 
@@ -318,7 +318,7 @@ The sidebar workspace switcher at `frontend/src/components/AppShell.tsx:144-151`
 
 **How to use it:** Select a knowledge base, choose ready documents, choose a mode, fill mode-specific fields, set language, and generate. Download report Markdown if needed.
 
-**How to test it:** Process two small documents. Test every summary kind, comparison, and report. Confirm required selection messages, citations, partial-result warning, timeout/model-busy messages, and Markdown download. Open `?knowledgeBase=<second-id>` and note that current code still selects the first returned collection.
+**How to test it:** Process two small documents. Test every summary kind, comparison, and report. Confirm required selection messages, citations, partial-result warning, timeout/model-busy messages, and Markdown download. Open `?knowledgeBase=<second-id>` and confirm that valid collection is selected; an unknown ID safely falls back to the first available collection.
 
 **Expected result:** The backend returns a grounded structured result with citations, verification, language, model, and generation metadata.
 
@@ -332,7 +332,7 @@ The sidebar workspace switcher at `frontend/src/components/AppShell.tsx:144-151`
 
 **Database models/tables:** Reads `knowledge_bases`, `documents`, `document_sections`, and `document_chunks`; no result persistence table.
 
-**Tests:** `backend/tests/test_intelligence.py`, `test_multilingual.py`, `test_low_memory.py`; Playwright navigation. No dedicated component unit test.
+**Tests:** `backend/tests/test_intelligence.py`, `test_multilingual.py`, `test_low_memory.py`; `frontend/src/pages/IntelligencePage.test.tsx` verifies query scoping; Playwright covers navigation.
 
 ## 12. Evaluation page
 
@@ -370,7 +370,7 @@ The sidebar workspace switcher at `frontend/src/components/AppShell.tsx:144-151`
 
 **Purpose:** Show stored helpful/unhelpful totals and complaint categories.
 
-**Main features:** Loads analytics and evaluation datasets; displays total feedback, helpful count/rate, unhelpful count, and category bars (`frontend/src/pages/FeedbackPage.tsx:13-107`). `convertFeedbackToEval` and datasets are imported/loaded but there is no feedback list, selector, submit form, or conversion button.
+**Main features:** Loads aggregate analytics with explicit loading and terminal error states, then displays total feedback, helpful count/rate, unhelpful count, and complaint categories (`frontend/src/pages/FeedbackPage.tsx`). There is no feedback list, selector, submit form, or conversion button.
 
 **How to use it:** Feedback must first be submitted through the API. Then open the page to view aggregate analytics.
 
@@ -380,13 +380,15 @@ The sidebar workspace switcher at `frontend/src/components/AppShell.tsx:144-151`
 
 **Possible errors:** Empty state is expected when no API-created feedback exists. The product chat has no visible rating buttons, so normal users cannot populate this from the UI. Conversion to an evaluation case is backend/client capability only.
 
-**Frontend files:** `frontend/src/pages/FeedbackPage.tsx`; unused submission/conversion client functions at `frontend/src/api/client.ts:486-526`.
+**Frontend files:** `frontend/src/pages/FeedbackPage.tsx`; submission/conversion client functions without a current page flow at `frontend/src/api/client.ts:486-526`.
 
 **API endpoints:** `POST /feedback`; `GET /feedback/analytics`; `POST /feedback/{id}/convert-to-eval`.
 
 **Backend files:** `backend/app/api/routes/feedback.py`; `backend/app/services/feedback.py`.
 
 **Database models/tables:** `user_feedback`, `evaluation_datasets`, `evaluation_cases`.
+
+**Tests:** `frontend/src/pages/FeedbackPage.test.tsx`; backend feedback coverage is in `backend/tests/test_evaluation.py`.
 
 **Tests:** `backend/tests/test_evaluation.py` covers evaluation interaction; feedback backend behavior may be exercised there. No dedicated frontend feedback test or complete end-to-end UI test.
 

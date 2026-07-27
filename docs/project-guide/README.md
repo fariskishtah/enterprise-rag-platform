@@ -9,7 +9,7 @@ This guide explains the repository as it exists now. It is written for a project
 3. [Feature guide](02-feature-guide.md) — end-to-end flows for ingestion, search, RAG, media, evaluation, auth, operations, and course-only features.
 4. [File map](03-file-map.md) — where to find the important code.
 5. [API reference](04-api-reference.md) — all 60 backend operations, payloads, handlers, and test examples.
-6. [Database guide](05-database-guide.md) — the 19 tables, relationships, lifecycle fields, and 4 migrations.
+6. [Database guide](05-database-guide.md) — the 19 tables, relationships, lifecycle fields, 4 migrations, and current migration-coverage gap.
 7. [Environment variables](06-environment-variables.md) — runtime, deployment, frontend, test, and course variables without secret values.
 8. [Testing guide](07-testing-guide.md) — practical smoke, automated, security, backup, and deployment checks.
 9. [Deployment guide](08-deployment-guide.md) — Docker, Nginx, AWS service files, persistence, backups, and the public request path.
@@ -25,7 +25,7 @@ This guide explains the repository as it exists now. It is written for a project
 | Backend API operations | 60 | FastAPI operations included through `backend/app/api/router.py:17-28`. |
 | Database tables | 19 | SQLAlchemy `__tablename__` declarations in `backend/app/models/`. |
 | Alembic migrations | 4 | `backend/migrations/versions/0001_...` through `0004_...`. |
-| Automated test files | 30 | 20 backend `test_*.py`, 8 frontend unit-test files, and 2 Playwright specs. `backend/tests/conftest.py` is support code, not a test file. |
+| Automated test files | 35 | 20 backend `test_*.py`, 13 frontend unit-test files, and 2 Playwright specs. `backend/tests/conftest.py` is support code, not a test file. |
 | Files in this guide | 12 | This README plus the 11 numbered documents above. |
 
 ## Reading conventions

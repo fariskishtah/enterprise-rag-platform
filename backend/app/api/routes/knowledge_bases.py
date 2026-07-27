@@ -41,7 +41,8 @@ def create_knowledge_base(
             code="knowledge_base_quota_exceeded",
             message=(
                 "The public demo knowledge-base limit has been reached. "
-                "Remove an existing knowledge base before creating another."
+                "Use an existing collection, wait for expired demo data cleanup, "
+                "or ask the operator to make capacity available."
             ),
         )
     repository = KnowledgeBaseRepository(session)

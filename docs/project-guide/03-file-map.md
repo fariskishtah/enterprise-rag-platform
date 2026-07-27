@@ -27,7 +27,7 @@ There is no `frontend/src/hooks/` or separate frontend service folder in the cur
 | `frontend/src/pages/LegalPage.tsx` | Renders the public privacy, terms/demo, and security notices from static page definitions. |
 | `frontend/src/pages/DashboardPage.tsx` | Aggregates KB/document/media/config data into overview metrics, recent sources, model details, and shortcuts. |
 | `frontend/src/pages/KnowledgeBasesPage.tsx` | Creates and lists knowledge bases and opens the focused workspace route. |
-| `frontend/src/pages/WorkspacePage.tsx` | Static knowledge-base-ID navigation hub; it does not load the collection record. |
+| `frontend/src/pages/WorkspacePage.tsx` | Static knowledge-base-ID navigation hub with verified destinations and scoped links for source/chat/intelligence; it does not load the collection record. |
 | `frontend/src/pages/UploadPage.tsx` | Document/media file and URL intake, processing polling, source library, search/filter/sort, refresh, and retry. |
 | `frontend/src/pages/DocumentPage.tsx` | Document status, original, extraction, preview, chunks, start/retry/delete, and bounded polling. |
 | `frontend/src/pages/ChatPage.tsx` | Grounded chat, sessions, response/language/debug options, citations, verification, and evidence drawer. |
@@ -169,10 +169,10 @@ Auth, evaluation, feedback, and template request models are defined close to the
 | File | Responsibility |
 |---|---|
 | `backend/migrations/env.py` | Connects Alembic to settings and SQLAlchemy metadata for online/offline migrations. |
-| `backend/migrations/versions/0001_phase1_baseline.py` | Creates initial users, knowledge bases, and documents. |
+| `backend/migrations/versions/0001_phase1_baseline.py` | Creates initial knowledge bases and documents. |
 | `backend/migrations/versions/0002_processing_rag_intelligence.py` | Adds processing columns/sections/chunks and chat session/message tables. |
 | `backend/migrations/versions/0003_media_intelligence.py` | Adds media sources, transcript, summary, chapter, attempt, and export tables. |
-| `backend/migrations/versions/0004_public_demo_lifecycle.py` | Adds lifecycle fields and creates evaluation/feedback tables for the public demo. |
+| `backend/migrations/versions/0004_public_demo_lifecycle.py` | Adds lifecycle fields and indexes to knowledge bases, documents, and media sources. It does not create users, evaluation, or feedback tables. |
 | `backend/scripts/migrate_database.py` | Runs migrations to head during startup/deployment. |
 
 ## Automated tests
@@ -183,7 +183,7 @@ Auth, evaluation, feedback, and template request models are defined close to the
 | Backend policy/operations | `test_public_demo_auth.py`, `test_public_demo_limits_cleanup.py`, `test_policy_e2e.py`, `test_backup_restore.py` verify access, quotas, cleanup, security policy, and maintenance scripts. |
 | Backend AI/runtime | `test_ai_providers.py`, `test_hardware.py`, `test_low_memory.py`, `test_langchain_course_layer.py` verify provider fallbacks, device/profile behavior, and direct course integration without remote models. |
 | Opt-in backend models | `test_real_huggingface_rag.py`, `test_real_langchain_rag.py`, `test_real_transcription.py` are marker-gated and require model files/network or explicit opt-in. |
-| Frontend unit | `frontend/src/api/client.test.ts`, component tests for citation/status, page tests for chat/document/login/settings, and `frontend/src/utils/language.test.ts`. |
+| Frontend unit | 13 files covering the API client, AppShell/citations/status, chat/dashboard/document/feedback/intelligence/login/settings/workspace pages, and language helpers. |
 | Browser | `frontend/e2e/enterprise-rag.spec.ts` exercises a deterministic browser/API fixture; `production-smoke.spec.ts` checks the built production app, navigation, routes, network failures, and console errors. |
 
 `backend/tests/conftest.py` creates disposable settings, database/storage, fake embedding/generation/transcription providers, and a FastAPI client. It is test support, not counted as a test file.
@@ -206,7 +206,6 @@ Auth, evaluation, feedback, and template request models are defined close to the
 | `.env.example` | Broad local configuration example with explanatory defaults. |
 | `.env.low-memory.example` | Reduced model/context/concurrency profile. |
 | `.env.aws-cpu.example` | Tracked AWS CPU/demo-password settings template; contains no deploy secret values. |
-| `.env.huggingface.example` | Hugging Face Docker Space `/tmp` profile. |
 | `.github/workflows/ci.yml` | Backend install/Ruff/deterministic tests and frontend install/type/build/unit checks. |
 
 ## Course compatibility and documentation

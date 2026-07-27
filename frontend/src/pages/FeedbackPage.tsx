@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { ThumbsUp, ThumbsDown, MessageSquare, ArrowUpRight } from "lucide-react";
-import { getFeedbackAnalytics, listEvaluationDatasets, convertFeedbackToEval } from "../api/client";
+import { getFeedbackAnalytics } from "../api/client";
 
 interface AnalyticsData {
   total_feedback: number;
@@ -12,19 +11,26 @@ interface AnalyticsData {
 
 export function FeedbackPage() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
-  const [datasets, setDatasets] = useState<Array<{ id: string; name: string }>>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([getFeedbackAnalytics(), listEvaluationDatasets()])
-      .then(([aData, dList]) => {
-        setAnalytics(aData);
-        setDatasets(dList);
+    let active = true;
+    getFeedbackAnalytics()
+      .then((data) => {
+        if (active) setAnalytics(data);
       })
       .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : "Unable to load feedback analytics.");
+        if (active) {
+          setError(err instanceof Error ? err.message : "Unable to load feedback analytics.");
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
+    return () => {
+      active = false;
+    };
   }, []);
 
   return (
@@ -33,15 +39,15 @@ export function FeedbackPage() {
         <div>
           <span className="eyebrow">User Satisfaction</span>
           <h1>Feedback Analytics</h1>
-          <p>Analyze helpfulness ratings, user complaints, and convert negative feedback to benchmark test cases.</p>
+          <p>Review aggregate helpfulness ratings and complaint categories captured by the feedback API.</p>
         </div>
       </div>
 
-      {error && <div className="notice error">{error}</div>}
-      {notice && <div className="notice success">{notice}</div>}
+      {error && <div className="notice error" role="alert">{error}</div>}
+      {loading && <div className="panel loading-state">Loading feedback analytics…</div>}
 
       {/* Analytics Cards */}
-      <div className="metrics-banner">
+      <div className="metrics-banner" aria-busy={loading}>
         <div className="metric-card">
           <span className="metric-label">Helpful Rate</span>
           <strong className="metric-value">

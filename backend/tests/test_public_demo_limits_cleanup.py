@@ -35,6 +35,8 @@ def test_knowledge_base_and_file_quotas_are_terminal(
     second = client.post("/api/v1/knowledge-bases", json={"name": "Second"})
     assert second.status_code == 422
     assert second.json()["error"]["code"] == "knowledge_base_quota_exceeded"
+    assert "cleanup" in second.json()["error"]["message"].lower()
+    assert "remove an existing knowledge base" not in second.json()["error"]["message"].lower()
 
     client.app.state.settings.max_files_per_knowledge_base = 1
     first_file = client.post(

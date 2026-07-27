@@ -3,7 +3,6 @@ import {
   BookOpenText,
   Bot,
   Boxes,
-  ChevronDown,
   CircleGauge,
   Command,
   FileStack,
@@ -141,14 +140,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
         </div>
 
-        <button className="workspace-switcher" title="Local intelligence workspace">
+        <div
+          className="workspace-switcher"
+          aria-label="Current workspace: Local intelligence"
+          title="Local intelligence workspace"
+        >
           <span className="workspace-avatar">ER</span>
           <span className="brand-copy">
             <small>Workspace</small>
             <strong>Local intelligence</strong>
           </span>
-          <ChevronDown className="brand-copy" size={15} />
-        </button>
+        </div>
 
         <a className="sidebar-create" href="/upload">
           <Plus size={16} />

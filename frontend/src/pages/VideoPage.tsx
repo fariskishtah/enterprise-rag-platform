@@ -1,6 +1,5 @@
 import {
   ArrowDownToLine,
-  ArrowRight,
   Bot,
   Captions,
   CheckCircle2,

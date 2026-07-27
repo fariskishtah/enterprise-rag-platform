@@ -37,7 +37,7 @@ Browser
 
 - **Frontend:** React renders the interface. It uses a small manual pathname router rather than React Router (`frontend/src/App.tsx:110-164`). `frontend/src/api/client.ts:27-147` adds the `/api/v1` prefix, a stored bearer token when present, same-origin cookies, request timeouts, and common error handling.
 - **Backend:** FastAPI defines the HTTP interface. `backend/app/api/router.py:17-28` includes 11 route modules. Services contain processing and AI logic; repositories contain common database queries.
-- **Database:** SQLAlchemy maps 19 tables. SQLite is the default (`backend/app/core/config.py:46`), and Alembic controls schema history.
+- **Database:** SQLAlchemy maps 19 tables and SQLite is the default (`backend/app/core/config.py:46`). Alembic tracks four revisions, but a fresh migration-only database currently lacks six ORM tables that application startup later creates with `Base.metadata.create_all`; this reproducibility gap is documented in the database and risk guides.
 - **File storage:** `LocalFileStorage` writes uploads below a configured root and prevents paths from escaping it (`backend/app/services/storage.py:20`). Extracted text and embeddings are stored in SQLite; original/derived files live in storage.
 - **Models:** sentence-transformers creates embeddings; Transformers supplies local answer generation; faster-whisper transcribes when no usable subtitle exists. Model providers are wired at `backend/app/main.py:142-180`.
 - **Optional LangChain engine:** selecting `rag_engine=langchain` creates a persistent FAISS pipeline and LCEL chains (`backend/app/main.py:160-171`; `backend/app/ai/langchain_engine/`). The custom engine remains the default (`backend/app/core/config.py:75-78`).
@@ -55,7 +55,7 @@ Browser
 | FastAPI | Defines the API, validation, middleware, and static SPA server. | `backend/app/main.py:52-226`; `backend/app/api/router.py` | `curl http://127.0.0.1:7860/api/v1/health`. |
 | Pydantic | Validates settings and request/response schemas. | `backend/app/core/config.py:15-292`; `backend/app/schemas/` | Start the app with an invalid bounded setting and observe startup validation. |
 | SQLAlchemy | Maps Python models to relational tables and runs queries. | `backend/app/models/`; `backend/app/db/session.py` | Run backend tests or inspect SQLite safely as described in the database guide. |
-| Alembic | Applies versioned database schema changes. | `backend/migrations/versions/`; `backend/alembic.ini` | `cd backend && .venv/bin/alembic current`. |
+| Alembic | Applies the tracked schema revisions; the current chain has a documented six-table coverage gap. | `backend/migrations/versions/`; `backend/alembic.ini`; `backend/app/main.py:66-72` | Upgrade a disposable database, compare its tables with `Base.metadata.tables`, and run the application tests. |
 | SQLite | Default local/production-demo relational database. | `backend/app/core/config.py:46`; `.env.aws-cpu.example` | Query `sqlite_master` read-only. |
 | sentence-transformers | Loads the embedding model and creates normalized vectors. | `backend/app/ai/providers/huggingface.py:16-154` | Run opted-in real-model tests after models are available. |
 | Transformers + PyTorch | Loads and runs the local generation model. | `backend/app/ai/providers/huggingface.py:156`; `backend/app/ai/quantization.py` | Warm models through `/api/v1/rag/warmup`, then inspect `/rag/config`. |

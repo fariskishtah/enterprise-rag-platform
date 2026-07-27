@@ -81,6 +81,10 @@ export function DashboardPage() {
   const readySources =
     documents.filter((value) => value.status === "ready_for_chat").length +
     media.filter((value) => value.status === "ready").length;
+  const totalSources = documents.length + media.length;
+  const readySourcePercentage = totalSources
+    ? Math.round((readySources / totalSources) * 100)
+    : null;
   const recentSources = [...documents, ...media]
     .sort(
       (first, second) =>
@@ -157,10 +161,7 @@ export function DashboardPage() {
           },
           {
             label: "Source health",
-            value:
-              documents.length + media.length > 0
-                ? `${Math.round((readySources / (documents.length + media.length)) * 100)}%`
-                : "—",
+            value: readySourcePercentage === null ? "—" : `${readySourcePercentage}%`,
             note: "Successfully indexed",
             icon: Gauge,
           },
@@ -231,21 +232,30 @@ export function DashboardPage() {
           <div className="section-heading">
             <div>
               <span className="eyebrow">Trust layer</span>
-              <h2>Retrieval health</h2>
+              <h2>Source readiness</h2>
             </div>
-            <span className="live-label"><span /> live</span>
+            <span className="live-label"><span /> current</span>
           </div>
           <div className="health-visual">
             <div className="health-score">
-              <span>{readySources ? "A" : "—"}</span>
-              <small>Grounding readiness</small>
+              <span>
+                {loading
+                  ? "…"
+                  : readySourcePercentage === null
+                    ? "—"
+                    : `${readySourcePercentage}%`}
+              </span>
+              <small>Sources ready</small>
             </div>
-            <div className="health-bars" aria-label="Retrieval health indicators">
-              <span style={{ "--health": "92%" } as React.CSSProperties} />
-              <span style={{ "--health": "76%" } as React.CSSProperties} />
-              <span style={{ "--health": "86%" } as React.CSSProperties} />
-              <span style={{ "--health": "97%" } as React.CSSProperties} />
-              <span style={{ "--health": "82%" } as React.CSSProperties} />
+            <div
+              className="health-progress"
+              role="progressbar"
+              aria-label="Ready sources"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={readySourcePercentage ?? 0}
+            >
+              <span style={{ width: `${readySourcePercentage ?? 0}%` }} />
             </div>
           </div>
           <dl className="health-details">
